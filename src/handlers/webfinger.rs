@@ -1,7 +1,6 @@
+use crate::config::Config;
 use actix_web::{get, web, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
-use crate::config::Config;
-use crate::models::Actor;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebFingerQuery {
@@ -28,14 +27,19 @@ pub async fn webfinger(
     config: web::Data<Config>,
 ) -> Result<HttpResponse> {
     let resource = &query.resource;
-    
+
     // Parse the resource to extract username
     // Expected format: acct:username@domain
     if let Some(username) = resource.strip_prefix("acct:") {
         if let Some((user, domain)) = username.rsplit_once('@') {
-            if domain == config.server_url.replace("http://", "").replace("https://", "") {
+            if domain
+                == config
+                    .server_url
+                    .replace("http://", "")
+                    .replace("https://", "")
+            {
                 let actor_url = format!("{}/users/{}", config.server_url, user);
-                
+
                 let response = WebFingerResponse {
                     subject: resource.clone(),
                     links: vec![
@@ -51,13 +55,13 @@ pub async fn webfinger(
                         },
                     ],
                 };
-                
+
                 return Ok(HttpResponse::Ok()
                     .content_type("application/jrd+json")
                     .json(response));
             }
         }
     }
-    
+
     Ok(HttpResponse::NotFound().finish())
-} 
+}

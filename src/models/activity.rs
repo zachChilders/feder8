@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +59,7 @@ pub struct Accept {
 }
 
 impl Activity {
+    #[allow(dead_code)]
     pub fn new(
         activity_type: String,
         actor: String,
@@ -80,6 +81,7 @@ impl Activity {
 }
 
 impl Create {
+    #[allow(dead_code)]
     pub fn new(actor: String, object: serde_json::Value, to: Vec<String>, cc: Vec<String>) -> Self {
         Self {
             context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
@@ -95,6 +97,7 @@ impl Create {
 }
 
 impl Follow {
+    #[allow(dead_code)]
     pub fn new(actor: String, object: String, to: Vec<String>, cc: Vec<String>) -> Self {
         Self {
             context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
@@ -110,6 +113,7 @@ impl Follow {
 }
 
 impl Accept {
+    #[allow(dead_code)]
     pub fn new(actor: String, object: serde_json::Value, to: Vec<String>, cc: Vec<String>) -> Self {
         Self {
             context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
@@ -122,4 +126,4 @@ impl Accept {
             published: Utc::now(),
         }
     }
-} 
+}
