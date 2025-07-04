@@ -18,7 +18,10 @@ fn create_test_app(db: DatabaseRef) -> App<
         InitError = (),
     >,
 > {
-    let config = Config::default();
+    let config = Config {
+        server_url: "https://example.com".to_string(),
+        ..Config::default()
+    };
     App::new()
         .app_data(web::Data::new(config))
         .app_data(web::Data::new(db))
@@ -116,12 +119,15 @@ async fn test_get_outbox_handler_success() {
 
     let actor_id = "https://example.com/users/testuser".to_string();
     let activity_id = "https://example.com/activities/1".to_string();
+    let actor_id_clone1 = actor_id.clone();
+    let actor_id_clone2 = actor_id.clone();
+    let activity_id_clone = activity_id.clone();
 
     mock.expect_get_actor_by_username()
         .with(eq("testuser"))
         .returning(move |_| {
             Ok(Some(DbActor {
-                id: actor_id.clone(),
+                id: actor_id_clone1.clone(),
                 username: "testuser".to_string(),
                 name: "Test User".to_string(),
                 summary: None,
@@ -141,8 +147,8 @@ async fn test_get_outbox_handler_success() {
         .returning(move |_, _, _| {
             Ok(vec![
                 DbActivity {
-                    id: activity_id.clone(),
-                    actor_id: actor_id.clone(),
+                    id: activity_id_clone.clone(),
+                    actor_id: actor_id_clone2.clone(),
                     activity_type: "Create".to_string(),
                     object: json!({"type": "Note", "content": "Hello, world!"}),
                     to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],

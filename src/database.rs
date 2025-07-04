@@ -1,6 +1,6 @@
-use crate::models::{Actor, Activity, Note, OrderedCollection};
+use crate::models::OrderedCollection;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use mockall::automock;
 use serde_json::Value;
 use sqlx::SqlitePool;
@@ -177,6 +177,10 @@ impl SqliteDatabase {
             .map_err(|e| DatabaseError::Connection(e.to_string()))?;
         Ok(())
     }
+
+    fn naive_to_utc(naive: NaiveDateTime) -> DateTime<Utc> {
+        Utc.from_utc_datetime(&naive)
+    }
 }
 
 #[async_trait]
@@ -210,14 +214,14 @@ impl Database for SqliteDatabase {
         .await?;
 
         Ok(row.map(|r| DbActor {
-            id: r.id,
+            id: r.id.unwrap_or_default(),
             username: r.username,
             name: r.name,
             summary: r.summary,
             public_key_pem: r.public_key_pem,
             private_key_pem: r.private_key_pem,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
+            created_at: Self::naive_to_utc(r.created_at),
+            updated_at: Self::naive_to_utc(r.updated_at),
         }))
     }
 
@@ -230,14 +234,14 @@ impl Database for SqliteDatabase {
         .await?;
 
         Ok(row.map(|r| DbActor {
-            id: r.id,
+            id: r.id.unwrap_or_default(),
             username: r.username,
             name: r.name,
             summary: r.summary,
             public_key_pem: r.public_key_pem,
             private_key_pem: r.private_key_pem,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
+            created_at: Self::naive_to_utc(r.created_at),
+            updated_at: Self::naive_to_utc(r.updated_at),
         }))
     }
 
@@ -301,14 +305,14 @@ impl Database for SqliteDatabase {
 
         Ok(row.map(|r| -> Result<DbActivity, DatabaseError> {
             Ok(DbActivity {
-                id: r.id,
+                id: r.id.unwrap_or_default(),
                 actor_id: r.actor_id,
                 activity_type: r.activity_type,
                 object: serde_json::from_str(&r.object)?,
                 to_recipients: serde_json::from_str(&r.to_recipients)?,
                 cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                published: r.published,
-                created_at: r.created_at,
+                published: Self::naive_to_utc(r.published),
+                created_at: Self::naive_to_utc(r.created_at),
             })
         }).transpose()?)
     }
@@ -331,14 +335,14 @@ impl Database for SqliteDatabase {
         rows.into_iter()
             .map(|r| -> Result<DbActivity, DatabaseError> {
                 Ok(DbActivity {
-                    id: r.id,
+                    id: r.id.unwrap_or_default(),
                     actor_id: r.actor_id,
                     activity_type: r.activity_type,
                     object: serde_json::from_str(&r.object)?,
                     to_recipients: serde_json::from_str(&r.to_recipients)?,
                     cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                    published: r.published,
-                    created_at: r.created_at,
+                    published: Self::naive_to_utc(r.published),
+                    created_at: Self::naive_to_utc(r.created_at),
                 })
             })
             .collect()
@@ -369,14 +373,14 @@ impl Database for SqliteDatabase {
         rows.into_iter()
             .map(|r| -> Result<DbActivity, DatabaseError> {
                 Ok(DbActivity {
-                    id: r.id,
+                    id: r.id.unwrap_or_default(),
                     actor_id: r.actor_id,
                     activity_type: r.activity_type,
                     object: serde_json::from_str(&r.object)?,
                     to_recipients: serde_json::from_str(&r.to_recipients)?,
                     cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                    published: r.published,
-                    created_at: r.created_at,
+                    published: Self::naive_to_utc(r.published),
+                    created_at: Self::naive_to_utc(r.created_at),
                 })
             })
             .collect()
@@ -417,15 +421,15 @@ impl Database for SqliteDatabase {
 
         Ok(row.map(|r| -> Result<DbNote, DatabaseError> {
             Ok(DbNote {
-                id: r.id,
+                id: r.id.unwrap_or_default(),
                 attributed_to: r.attributed_to,
                 content: r.content,
                 to_recipients: serde_json::from_str(&r.to_recipients)?,
                 cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                published: r.published,
+                published: Self::naive_to_utc(r.published),
                 in_reply_to: r.in_reply_to,
                 tags: serde_json::from_str(&r.tags)?,
-                created_at: r.created_at,
+                created_at: Self::naive_to_utc(r.created_at),
             })
         }).transpose()?)
     }
@@ -448,15 +452,15 @@ impl Database for SqliteDatabase {
         rows.into_iter()
             .map(|r| -> Result<DbNote, DatabaseError> {
                 Ok(DbNote {
-                    id: r.id,
+                    id: r.id.unwrap_or_default(),
                     attributed_to: r.attributed_to,
                     content: r.content,
                     to_recipients: serde_json::from_str(&r.to_recipients)?,
                     cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                    published: r.published,
+                    published: Self::naive_to_utc(r.published),
                     in_reply_to: r.in_reply_to,
                     tags: serde_json::from_str(&r.tags)?,
-                    created_at: r.created_at,
+                    created_at: Self::naive_to_utc(r.created_at),
                 })
             })
             .collect()
@@ -496,12 +500,12 @@ impl Database for SqliteDatabase {
         .await?;
 
         Ok(row.map(|r| DbFollowRelation {
-            id: r.id,
+            id: r.id.unwrap_or_default(),
             follower_id: r.follower_id,
             following_id: r.following_id,
             status: r.status,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
+            created_at: Self::naive_to_utc(r.created_at),
+            updated_at: Self::naive_to_utc(r.updated_at),
         }))
     }
 
@@ -521,12 +525,12 @@ impl Database for SqliteDatabase {
         .await?;
 
         Ok(rows.into_iter().map(|r| DbFollowRelation {
-            id: r.id,
+            id: r.id.unwrap_or_default(),
             follower_id: r.follower_id,
             following_id: r.following_id,
             status: r.status,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
+            created_at: Self::naive_to_utc(r.created_at),
+            updated_at: Self::naive_to_utc(r.updated_at),
         }).collect())
     }
 
@@ -546,12 +550,12 @@ impl Database for SqliteDatabase {
         .await?;
 
         Ok(rows.into_iter().map(|r| DbFollowRelation {
-            id: r.id,
+            id: r.id.unwrap_or_default(),
             follower_id: r.follower_id,
             following_id: r.following_id,
             status: r.status,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
+            created_at: Self::naive_to_utc(r.created_at),
+            updated_at: Self::naive_to_utc(r.updated_at),
         }).collect())
     }
 
@@ -560,10 +564,11 @@ impl Database for SqliteDatabase {
         follow_id: &str,
         status: &str,
     ) -> Result<(), DatabaseError> {
+        let now = Utc::now();
         sqlx::query!(
             "UPDATE follows SET status = ?, updated_at = ? WHERE id = ?",
             status,
-            Utc::now(),
+            now,
             follow_id
         )
         .execute(&self.pool)

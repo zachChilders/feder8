@@ -116,7 +116,7 @@ pub async fn inbox(
             "Follow" => {
                 info!("Processing Follow activity");
                 // Handle Follow activity
-                let activity_id = activity.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let _activity_id = activity.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let follower_id = activity.get("actor").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let following_id = activity.get("object").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 

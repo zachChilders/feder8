@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, actor_id, activity_type, object, to_recipients, cc_recipients, published, created_at\n            FROM activities \n            WHERE to_recipients LIKE '%' || ? || '%' OR cc_recipients LIKE '%' || ? || '%'\n            ORDER BY published DESC \n            LIMIT ? OFFSET ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "actor_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "activity_type",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "object",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "to_recipients",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "cc_recipients",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "published",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "534490bea8f650660437b730c22858f8717484c504c934f0289b151a491acff9"
+}

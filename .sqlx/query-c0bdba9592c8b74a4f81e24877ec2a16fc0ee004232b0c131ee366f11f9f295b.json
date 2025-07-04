@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO actors (id, username, name, summary, public_key_pem, private_key_pem, created_at, updated_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "c0bdba9592c8b74a4f81e24877ec2a16fc0ee004232b0c131ee366f11f9f295b"
+}

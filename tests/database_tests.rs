@@ -117,6 +117,8 @@ async fn test_mock_database_note_operations() {
         tags: vec![],
         created_at: Utc::now(),
     };
+    let test_note_clone1 = test_note.clone();
+    let test_note_clone2 = test_note.clone();
     
     // Test create_note
     mock.expect_create_note()
@@ -126,14 +128,14 @@ async fn test_mock_database_note_operations() {
     mock.expect_get_note_by_id()
         .with(eq(test_note.id.clone()))
         .returning(move |_| {
-            Ok(Some(test_note.clone()))
+            Ok(Some(test_note_clone1.clone()))
         });
     
     // Test get_notes_by_actor
     mock.expect_get_notes_by_actor()
         .with(eq("https://example.com/users/testuser"), eq(20), eq(0))
         .returning(move |_, _, _| {
-            Ok(vec![test_note.clone()])
+            Ok(vec![test_note_clone2.clone()])
         });
     
     let db: DatabaseRef = Arc::new(mock);
@@ -177,6 +179,8 @@ async fn test_mock_database_follow_operations() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
+    let test_follow_clone1 = test_follow.clone();
+    let test_follow_clone2 = test_follow.clone();
     
     // Test create_follow
     mock.expect_create_follow()
@@ -186,14 +190,14 @@ async fn test_mock_database_follow_operations() {
     mock.expect_get_followers()
         .with(eq("https://example.com/users/bob"), eq(20), eq(0))
         .returning(move |_, _, _| {
-            Ok(vec![test_follow.clone()])
+            Ok(vec![test_follow_clone1.clone()])
         });
     
     // Test get_following
     mock.expect_get_following()
         .with(eq("https://example.com/users/alice"), eq(20), eq(0))
         .returning(move |_, _, _| {
-            Ok(vec![test_follow.clone()])
+            Ok(vec![test_follow_clone2.clone()])
         });
     
     // Test get_actor_followers_count
@@ -342,18 +346,29 @@ async fn test_database_with_complex_data() {
 async fn test_database_integration_scenario() {
     let mut mock = MockDatabase::new();
     
-    // Setup expectations for a complete scenario
+        // Setup expectations for a complete scenario
     let actor_id = "https://example.com/users/alice".to_string();
     let follower_id = "https://example.com/users/bob".to_string();
     let note_id = "https://example.com/notes/1".to_string();
     let activity_id = "https://example.com/activities/1".to_string();
     
+    // Create clones for closures
+    let actor_id_clone1 = actor_id.clone();
+    let actor_id_clone2 = actor_id.clone();
+    let actor_id_clone3 = actor_id.clone();
+    let actor_id_clone4 = actor_id.clone();
+    let follower_id_clone1 = follower_id.clone();
+    let follower_id_clone2 = follower_id.clone();
+    let note_id_clone = note_id.clone();
+    let activity_id_clone1 = activity_id.clone();
+    let activity_id_clone2 = activity_id.clone();
+
     // Actor operations
     mock.expect_get_actor_by_username()
         .with(eq("alice"))
         .returning(move |_| {
             Ok(Some(DbActor {
-                id: actor_id.clone(),
+                id: actor_id_clone1.clone(),
                 username: "alice".to_string(),
                 name: "Alice".to_string(),
                 summary: Some("Alice's profile".to_string()),
@@ -372,8 +387,8 @@ async fn test_database_integration_scenario() {
         .with(eq(actor_id.clone()), eq(10), eq(0))
         .returning(move |_, _, _| {
             Ok(vec![DbNote {
-                id: note_id.clone(),
-                attributed_to: actor_id.clone(),
+                id: note_id_clone.clone(),
+                attributed_to: actor_id_clone2.clone(),
                 content: "Hello from Alice!".to_string(),
                 to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
                 cc_recipients: vec![],
@@ -392,8 +407,8 @@ async fn test_database_integration_scenario() {
         .with(eq(actor_id.clone()), eq(10), eq(0))
         .returning(move |_, _, _| {
             Ok(vec![DbActivity {
-                id: activity_id.clone(),
-                actor_id: actor_id.clone(),
+                id: activity_id_clone1.clone(),
+                actor_id: actor_id_clone3.clone(),
                 activity_type: "Create".to_string(),
                 object: json!({"type": "Note", "content": "Hello from Alice!"}),
                 to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
@@ -412,8 +427,8 @@ async fn test_database_integration_scenario() {
         .returning(move |_, _, _| {
             Ok(vec![DbFollowRelation {
                 id: "https://example.com/follows/1".to_string(),
-                follower_id: follower_id.clone(),
-                following_id: actor_id.clone(),
+                follower_id: follower_id_clone1.clone(),
+                following_id: actor_id_clone4.clone(),
                 status: "accepted".to_string(),
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
@@ -443,7 +458,7 @@ async fn test_database_integration_scenario() {
     
     // 3. Create activity
     let activity = DbActivity {
-        id: activity_id.clone(),
+        id: activity_id_clone2.clone(),
         actor_id: actor.id.clone(),
         activity_type: "Create".to_string(),
         object: json!({"type": "Note", "content": "New note from Alice"}),
@@ -457,7 +472,7 @@ async fn test_database_integration_scenario() {
     // 4. Create follow relationship
     let follow = DbFollowRelation {
         id: "https://example.com/follows/2".to_string(),
-        follower_id: follower_id.clone(),
+        follower_id: follower_id_clone2.clone(),
         following_id: actor.id.clone(),
         status: "pending".to_string(),
         created_at: Utc::now(),
