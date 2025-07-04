@@ -1,19 +1,22 @@
+use crate::config::Config;
 use actix_web::{post, web, HttpResponse, Result};
 use serde_json::Value;
-use crate::config::Config;
 use tracing::{info, warn};
 
 #[post("/users/{username}/inbox")]
 pub async fn inbox(
     path: web::Path<String>,
     payload: web::Json<Value>,
-    config: web::Data<Config>,
+    _config: web::Data<Config>,
 ) -> Result<HttpResponse> {
     let username = path.into_inner();
     let activity = payload.into_inner();
-    
-    info!("Received activity in inbox for user {}: {:?}", username, activity);
-    
+
+    info!(
+        "Received activity in inbox for user {}: {:?}",
+        username, activity
+    );
+
     // Extract activity type
     if let Some(activity_type) = activity.get("type").and_then(|v| v.as_str()) {
         match activity_type {
@@ -49,7 +52,7 @@ pub async fn inbox(
             }
         }
     }
-    
+
     // Always return 202 Accepted for inbox POST requests
     Ok(HttpResponse::Accepted().finish())
-} 
+}

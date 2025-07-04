@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Actor {
@@ -40,13 +40,13 @@ pub struct Icon {
 
 impl Actor {
     pub fn new(
-        id: String,
+        _id: String,
         name: String,
         username: String,
         server_url: &str,
         public_key_pem: String,
     ) -> Self {
-        let actor_id = format!("{}/users/{}", server_url, username);
+        let actor_id = format!("{server_url}/users/{username}");
         Self {
             context: vec![
                 "https://www.w3.org/ns/activitystreams".to_string(),
@@ -58,12 +58,12 @@ impl Actor {
             preferred_username: username,
             summary: None,
             url: actor_id.clone(),
-            inbox: format!("{}/inbox", actor_id),
-            outbox: format!("{}/outbox", actor_id),
-            followers: format!("{}/followers", actor_id),
-            following: format!("{}/following", actor_id),
+            inbox: format!("{actor_id}/inbox"),
+            outbox: format!("{actor_id}/outbox"),
+            followers: format!("{actor_id}/followers"),
+            following: format!("{actor_id}/following"),
             public_key: PublicKey {
-                id: format!("{}#main-key", actor_id),
+                id: format!("{actor_id}#main-key"),
                 key_type: "Key".to_string(),
                 owner: actor_id,
                 public_key_pem,
@@ -72,4 +72,4 @@ impl Actor {
             icon: None,
         }
     }
-} 
+}

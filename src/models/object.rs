@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
@@ -7,13 +7,22 @@ pub struct Note {
     pub context: Vec<String>,
     pub id: String,
     #[serde(rename = "type")]
-    pub object_type: String,
+    pub note_type: String,
     pub attributed_to: String,
     pub content: String,
     pub to: Vec<String>,
     pub cc: Vec<String>,
     pub published: DateTime<Utc>,
-    pub url: Option<String>,
+    pub in_reply_to: Option<String>,
+    pub tag: Vec<Tag>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tag {
+    #[serde(rename = "type")]
+    pub tag_type: String,
+    pub name: String,
+    pub href: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +51,7 @@ pub struct OrderedCollection {
 }
 
 impl Note {
+    #[allow(dead_code)]
     pub fn new(
         id: String,
         attributed_to: String,
@@ -52,26 +62,28 @@ impl Note {
         Self {
             context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
             id,
-            object_type: "Note".to_string(),
+            note_type: "Note".to_string(),
             attributed_to,
             content,
             to,
             cc,
             published: Utc::now(),
-            url: None,
+            in_reply_to: None,
+            tag: vec![],
         }
     }
 }
 
 impl Collection {
+    #[allow(dead_code)]
     pub fn new(id: String, total_items: u32) -> Self {
         Self {
             context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
             id: id.clone(),
             collection_type: "Collection".to_string(),
             total_items,
-            first: format!("{}?page=true", id),
-            last: format!("{}?page=true", id),
+            first: format!("{id}?page=true"),
+            last: format!("{id}?page=true"),
         }
     }
 }
@@ -83,9 +95,9 @@ impl OrderedCollection {
             id: id.clone(),
             collection_type: "OrderedCollection".to_string(),
             total_items,
-            first: format!("{}?page=true", id),
-            last: format!("{}?page=true", id),
+            first: format!("{id}?page=true"),
+            last: format!("{id}?page=true"),
             ordered_items,
         }
     }
-} 
+}

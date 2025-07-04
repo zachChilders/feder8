@@ -1,10 +1,9 @@
 mod config;
-mod models;
 mod handlers;
+mod models;
 mod services;
 
-use actix_web::{web, App, HttpServer, middleware::Logger};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -12,7 +11,7 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     let config = config::Config::default();
-    
+
     tracing::info!("Starting Fediverse server on port {}", config.port);
     tracing::info!("Server URL: {}", config.server_url);
     tracing::info!("Actor name: {}", config.actor_name);

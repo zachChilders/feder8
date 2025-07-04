@@ -15,7 +15,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             server_name: env::var("SERVER_NAME").unwrap_or_else(|_| "Fediverse Node".to_string()),
-            server_url: env::var("SERVER_URL").unwrap_or_else(|_| "http://localhost:8080".to_string()),
+            server_url: env::var("SERVER_URL")
+                .unwrap_or_else(|_| "http://localhost:8080".to_string()),
             port: env::var("PORT")
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
@@ -25,4 +26,4 @@ impl Default for Config {
             public_key_path: env::var("PUBLIC_KEY_PATH").ok(),
         }
     }
-} 
+}
