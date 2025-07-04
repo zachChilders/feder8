@@ -25,7 +25,5 @@ tokio-test = "0.4"
 tempfile = "3.0"
 testcontainers = "0.15"
 testcontainers-modules = { version = "0.3", features = ["redis"] }
+rand = "0.8"
 
-[[example]]
-name = "two_node_test"
-path = "examples/two_node_test.rs"

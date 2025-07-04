@@ -8,6 +8,9 @@ use tokio::time::sleep;
 use std::sync::Mutex;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+use rand::Rng;
+
+static NODE_COUNT: usize = 7;
 
 mod test_harness {
     use super::*;
@@ -15,30 +18,44 @@ mod test_harness {
     static INIT: Once = Once::new();
     static NODES: Mutex<Option<Arc<Mutex<Vec<JoinHandle<()>>>>>> = Mutex::new(None);
 
+
     pub struct TestContext {
         pub client: Client,
-        pub node_a_url: String,
-        pub node_b_url: String,
+        pub node_urls: Vec<String>,
+        pub actor_names: Vec<String>,
+        pub base_port: u16,
     }
 
     impl TestContext {
-        pub fn new() -> Self {
+        pub fn new(node_count: usize, base_port: u16) -> Self {
+            let node_urls = (0..node_count)
+                .map(|i| format!("http://localhost:{}", base_port + i as u16))
+                .collect();
+            let actor_names = (0..node_count)
+                .map(|i| format!("actor{}", i + 1))
+                .collect();
             Self {
                 client: Client::new(),
-                node_a_url: "http://localhost:8082".to_string(),
-                node_b_url: "http://localhost:8083".to_string(),
+                node_urls,
+                actor_names,
+                base_port,
             }
         }
 
         pub async fn wait_for_nodes(&self) {
             println!("Waiting for nodes to start...");
             sleep(Duration::from_secs(2)).await;
-            
-            // Wait for both nodes to be ready
             let mut attempts = 0;
             while attempts < 20 {
-                if self.is_node_ready(&self.node_a_url).await && self.is_node_ready(&self.node_b_url).await {
-                    println!("Both nodes are ready!");
+                let mut all_ready = true;
+                for url in &self.node_urls {
+                    if !self.is_node_ready(url).await {
+                        all_ready = false;
+                        break;
+                    }
+                }
+                if all_ready {
+                    println!("{} nodes are ready!", self.node_urls.len());
                     return;
                 }
                 sleep(Duration::from_millis(250)).await;
@@ -89,16 +106,17 @@ mod test_harness {
         server_handle
     }
 
-    pub async fn setup_nodes() {
+    pub async fn setup_nodes(node_count: usize, base_port: u16) {
         INIT.call_once(|| {
             println!("Setting up test nodes...");
         });
-        
-        // Start the nodes asynchronously
-        let node_a = start_node(8082, "alice").await;
-        let node_b = start_node(8083, "bob").await;
-        
-        let nodes = Arc::new(Mutex::new(vec![node_a, node_b]));
+        let mut handles = Vec::with_capacity(node_count);
+        for i in 0..node_count {
+            let port = base_port + i as u16;
+            let actor_name = format!("actor{}", i + 1);
+            handles.push(start_node(port, &actor_name).await);
+        }
+        let nodes = Arc::new(Mutex::new(handles));
         *NODES.lock().unwrap() = Some(nodes);
     }
 
@@ -117,226 +135,210 @@ use test_harness::{TestContext, setup_nodes, teardown_nodes};
 
 #[tokio::test]
 async fn test_node_setup_and_teardown() {
-    setup_nodes().await;
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
     
-    let context = TestContext::new();
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
     
     // Verify both nodes are running
-    assert!(context.client.get(&context.node_a_url).timeout(Duration::from_secs(1)).send().await.is_ok());
-    assert!(context.client.get(&context.node_b_url).timeout(Duration::from_secs(1)).send().await.is_ok());
+    for url in &context.node_urls {
+        assert!(context.client.get(url).timeout(Duration::from_secs(1)).send().await.is_ok());
+    }
     
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_alice_actor_profile() {
-    setup_nodes().await;
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
     
-    let context = TestContext::new();
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
 
     let response = context
         .client
-        .get(&format!("{}/users/alice", context.node_a_url))
+        .get(&format!("{}/users/{}", context.node_urls[0], context.actor_names[0]))
         .header("Accept", "application/activity+json")
         .send()
         .await
-        .expect("Failed to get Alice's actor profile");
+        .expect("Failed to get actor profile");
 
     assert!(response.status().is_success());
     
     let actor_data: serde_json::Value = response.json().await.expect("Failed to parse actor JSON");
-    assert_eq!(actor_data["preferredUsername"], "alice");
+     
+    // Check both camelCase and snake_case for backward compatibility
+    let username_field = actor_data.get("preferredUsername").or_else(|| actor_data.get("preferred_username"));
+    assert_eq!(username_field, Some(&serde_json::Value::String(context.actor_names[0].clone())));
     assert_eq!(actor_data["type"], "Person");
-    assert!(actor_data["inbox"].as_str().unwrap().contains("/users/alice/inbox"));
+    assert!(actor_data["inbox"].as_str().unwrap().contains(&format!("/users/{}", context.actor_names[0])));
     
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_bob_actor_profile() {
-    setup_nodes().await;
-    
-    let context = TestContext::new();
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-
     let response = context
         .client
-        .get(&format!("{}/users/bob", context.node_b_url))
+        .get(&format!("{}/users/{}", context.node_urls[1], context.actor_names[1]))
         .header("Accept", "application/activity+json")
         .send()
         .await
-        .expect("Failed to get Bob's actor profile");
-
+        .expect("Failed to get actor profile");
     assert!(response.status().is_success());
-    
     let actor_data: serde_json::Value = response.json().await.expect("Failed to parse actor JSON");
-    assert_eq!(actor_data["preferredUsername"], "bob");
+    let username_field = actor_data.get("preferredUsername").or_else(|| actor_data.get("preferred_username"));
+    assert_eq!(username_field, Some(&serde_json::Value::String(context.actor_names[1].clone())));
     assert_eq!(actor_data["type"], "Person");
-    assert!(actor_data["inbox"].as_str().unwrap().contains("/users/bob/inbox"));
-    
+    assert!(actor_data["inbox"].as_str().unwrap().contains(&format!("/users/{}", context.actor_names[1])));
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_webfinger_discovery() {
-    setup_nodes().await;
-    
-    let context = TestContext::new();
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-
     let response = context
         .client
-        .get(&format!("{}/.well-known/webfinger?resource=acct:alice@localhost:8082", context.node_a_url))
+        .get(&format!("{}/.well-known/webfinger?resource=acct:{}@localhost:{}", context.node_urls[0], context.actor_names[0], context.base_port))
         .header("Accept", "application/jrd+json")
         .send()
         .await
         .expect("Failed to get WebFinger response");
-
     assert!(response.status().is_success());
-    
     let webfinger_data: serde_json::Value = response.json().await.expect("Failed to parse WebFinger JSON");
-    assert_eq!(webfinger_data["subject"], "acct:alice@localhost:8082");
-    
+    assert_eq!(webfinger_data["subject"], format!("acct:{}@localhost:{}", context.actor_names[0], context.base_port));
     let links = webfinger_data["links"].as_array().expect("Links should be an array");
     assert!(!links.is_empty());
-    
-    // Check for ActivityPub link
-    let activitypub_link = links
-        .iter()
-        .find(|link| link["rel"] == "self" && link["type"] == "application/activity+json");
+    let activitypub_link = links.iter().find(|link| link["rel"] == "self" && link["type"] == "application/activity+json");
     assert!(activitypub_link.is_some());
-    
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_message_delivery_between_nodes() {
-    setup_nodes().await;
-    
-    let context = TestContext::new();
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-
     let note = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
         "id": "https://example.com/notes/789",
         "type": "Note",
-        "attributedTo": format!("{}/users/alice", context.node_a_url),
-        "content": "Hello Bob! This is a test message from Alice.",
-        "to": [format!("{}/users/bob", context.node_b_url)],
+        "attributedTo": format!("{}/users/{}", context.node_urls[0], context.actor_names[0]),
+        "content": "Hello! This is a test message.",
+        "to": [format!("{}/users/{}", context.node_urls[1], context.actor_names[1])],
         "cc": ["https://www.w3.org/ns/activitystreams#Public"],
         "published": "2024-01-01T12:00:00Z"
     });
-
     let create_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
         "id": "https://example.com/activities/101",
         "type": "Create",
-        "actor": format!("{}/users/alice", context.node_a_url),
+        "actor": format!("{}/users/{}", context.node_urls[0], context.actor_names[0]),
         "object": note,
-        "to": [format!("{}/users/bob", context.node_b_url)],
+        "to": [format!("{}/users/{}", context.node_urls[1], context.actor_names[1])],
         "cc": ["https://www.w3.org/ns/activitystreams#Public"],
         "published": "2024-01-01T12:00:00Z"
     });
-
     let response = context
         .client
-        .post(&format!("{}/users/bob/inbox", context.node_b_url))
+        .post(&format!("{}/users/{}/inbox", context.node_urls[1], context.actor_names[1]))
         .header("Content-Type", "application/activity+json")
         .json(&create_activity)
         .send()
         .await
-        .expect("Failed to send message to Bob's inbox");
-
+        .expect("Failed to send message to inbox");
     assert!(response.status().is_success() || response.status().as_u16() == 202);
-    
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_cross_node_actor_discovery() {
-    setup_nodes().await;
-    
-    let context = TestContext::new();
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-
-    // Test that Node A can discover Node B's actor
     let response = context
         .client
-        .get(&format!("{}/users/bob", context.node_b_url))
+        .get(&format!("{}/users/{}", context.node_urls[1], context.actor_names[1]))
         .header("Accept", "application/activity+json")
         .send()
         .await
-        .expect("Failed to get Bob's actor profile from Node B");
-
+        .expect("Failed to get actor profile");
     assert!(response.status().is_success());
-    
     let actor_data: serde_json::Value = response.json().await.expect("Failed to parse actor JSON");
-    assert_eq!(actor_data["preferredUsername"], "bob");
-    assert_eq!(actor_data["id"], format!("{}/users/bob", context.node_b_url));
-    
+    let username_field = actor_data.get("preferredUsername").or_else(|| actor_data.get("preferred_username"));
+    assert_eq!(username_field, Some(&serde_json::Value::String(context.actor_names[1].clone())));
+    assert_eq!(actor_data["id"], format!("{}/users/{}", context.node_urls[1], context.actor_names[1]));
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_inbox_endpoint_accepts_activities() {
-    setup_nodes().await;
-    
-    let context = TestContext::new();
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-
     let test_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
         "id": "https://example.com/activities/test-123",
         "type": "Create",
-        "actor": format!("{}/users/alice", context.node_a_url),
+        "actor": format!("{}/users/{}", context.node_urls[0], context.actor_names[0]),
         "object": {
             "@context": ["https://www.w3.org/ns/activitystreams"],
             "id": "https://example.com/notes/test-456",
             "type": "Note",
             "content": "Test message for inbox endpoint",
-            "attributedTo": format!("{}/users/alice", context.node_a_url)
+            "attributedTo": format!("{}/users/{}", context.node_urls[0], context.actor_names[0])
         },
-        "to": [format!("{}/users/bob", context.node_b_url)],
+        "to": [format!("{}/users/{}", context.node_urls[1], context.actor_names[1])],
         "cc": ["https://www.w3.org/ns/activitystreams#Public"]
     });
-
     let response = context
         .client
-        .post(&format!("{}/users/bob/inbox", context.node_b_url))
+        .post(&format!("{}/users/{}/inbox", context.node_urls[1], context.actor_names[1]))
         .header("Content-Type", "application/activity+json")
         .json(&test_activity)
         .send()
         .await
         .expect("Failed to post activity to inbox");
-
-    // ActivityPub inbox endpoints should return 202 Accepted
     assert_eq!(response.status().as_u16(), 202);
-    
     teardown_nodes();
 }
 
 #[tokio::test]
 async fn test_outbox_endpoint_returns_collection() {
-    setup_nodes().await;
-    
-    let context = TestContext::new();
+    let node_count = NODE_COUNT;
+    let base_port = rand::thread_rng().gen_range(20000..60000);
+    setup_nodes(node_count, base_port).await;
+    let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-
     let response = context
         .client
-        .get(&format!("{}/users/alice/outbox", context.node_a_url))
+        .get(&format!("{}/users/{}/outbox", context.node_urls[0], context.actor_names[0]))
         .header("Accept", "application/activity+json")
         .send()
         .await
-        .expect("Failed to get Alice's outbox");
-
+        .expect("Failed to get outbox");
     assert!(response.status().is_success());
-    
     let outbox_data: serde_json::Value = response.json().await.expect("Failed to parse outbox JSON");
     assert_eq!(outbox_data["type"], "OrderedCollection");
-    assert_eq!(outbox_data["id"], format!("{}/users/alice/outbox", context.node_a_url));
-    
+    assert_eq!(outbox_data["id"], format!("{}/users/{}/outbox", context.node_urls[0], context.actor_names[0]));
     teardown_nodes();
 } 

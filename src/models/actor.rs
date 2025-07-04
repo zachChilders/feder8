@@ -9,6 +9,7 @@ pub struct Actor {
     #[serde(rename = "type")]
     pub actor_type: String,
     pub name: String,
+    #[serde(rename = "preferredUsername")]
     pub preferred_username: String,
     pub summary: Option<String>,
     pub url: String,
@@ -16,6 +17,7 @@ pub struct Actor {
     pub outbox: String,
     pub followers: String,
     pub following: String,
+    #[serde(rename = "publicKey")]
     pub public_key: PublicKey,
     pub published: DateTime<Utc>,
     pub icon: Option<Icon>,
@@ -27,6 +29,7 @@ pub struct PublicKey {
     #[serde(rename = "type")]
     pub key_type: String,
     pub owner: String,
+    #[serde(rename = "publicKeyPem")]
     pub public_key_pem: String,
 }
 
@@ -35,6 +38,7 @@ pub struct Icon {
     #[serde(rename = "type")]
     pub icon_type: String,
     pub url: String,
+    #[serde(rename = "mediaType")]
     pub media_type: String,
 }
 
