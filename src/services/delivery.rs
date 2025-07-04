@@ -4,13 +4,38 @@ use reqwest::Client;
 use serde_json::Value;
 use tracing::{error, info, warn};
 
-#[allow(dead_code)]
+#[derive(Clone)]
 pub struct DeliveryService {
     client: Client,
     config: Config,
 }
 
-#[allow(dead_code)]
+// Delivery result with functional patterns
+#[derive(Debug)]
+pub struct DeliveryResult {
+    pub inbox_url: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+impl DeliveryResult {
+    fn success(inbox_url: String) -> Self {
+        Self {
+            inbox_url,
+            success: true,
+            error: None,
+        }
+    }
+
+    fn failure(inbox_url: String, error: String) -> Self {
+        Self {
+            inbox_url,
+            success: false,
+            error: Some(error),
+        }
+    }
+}
+
 impl DeliveryService {
     pub fn new(config: Config) -> Self {
         Self {
@@ -19,7 +44,8 @@ impl DeliveryService {
         }
     }
 
-    pub async fn deliver_activity(&self, inbox_url: &str, activity: Value) -> Result<()> {
+    // Core delivery method with functional error handling
+    pub async fn deliver_activity(&self, inbox_url: &str, activity: &Value) -> Result<DeliveryResult> {
         info!("Delivering activity to inbox: {}", inbox_url);
 
         let response = self
@@ -30,63 +56,131 @@ impl DeliveryService {
                 "User-Agent",
                 format!("Fediverse-Node/{}", env!("CARGO_PKG_VERSION")),
             )
-            .json(&activity)
+            .json(activity)
             .send()
-            .await?;
+            .await
+            .map_err(|e| {
+                warn!("Failed to send request to {}: {}", inbox_url, e);
+                e
+            })?;
 
-        if response.status().is_success() {
-            info!("Successfully delivered activity to {}", inbox_url);
-        } else {
-            warn!(
-                "Failed to deliver activity to {}: {}",
-                inbox_url,
-                response.status()
-            );
-            if let Ok(error_text) = response.text().await {
-                error!("Error response: {}", error_text);
+        match response.status().is_success() {
+            true => {
+                info!("Successfully delivered activity to {}", inbox_url);
+                Ok(DeliveryResult::success(inbox_url.to_string()))
+            }
+            false => {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error_msg = format!("HTTP {}: {}", status, error_text);
+                
+                warn!("Failed to deliver activity to {}: {}", inbox_url, error_msg);
+                Ok(DeliveryResult::failure(inbox_url.to_string(), error_msg))
             }
         }
-
-        Ok(())
     }
 
-    pub async fn deliver_to_followers(
+    // Functional delivery to multiple recipients
+    pub async fn deliver_to_inboxes(
         &self,
-        activity: Value,
-        followers: Vec<String>,
-    ) -> Result<()> {
+        activity: &Value,
+        inboxes: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Vec<DeliveryResult> {
+        let futures = inboxes
+            .into_iter()
+            .map(|inbox| self.deliver_activity(inbox.as_ref(), activity));
+
+        // Execute all deliveries in parallel and collect results
+        futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .map(|result| result.unwrap_or_else(|e| {
+                DeliveryResult::failure("unknown".to_string(), e.to_string())
+            }))
+            .collect()
+    }
+
+    // Simplified delivery methods using the core function
+    pub async fn deliver_to_followers(&self, activity: &Value, followers: Vec<String>) -> Result<Vec<DeliveryResult>> {
         info!("Delivering activity to {} followers", followers.len());
-
-        for follower_inbox in followers {
-            if let Err(e) = self
-                .deliver_activity(&follower_inbox, activity.clone())
-                .await
-            {
-                warn!("Failed to deliver to {}: {}", follower_inbox, e);
-            }
-        }
-
-        Ok(())
+        Ok(self.deliver_to_inboxes(activity, followers).await)
     }
 
-    pub async fn deliver_to_public(
+    pub async fn deliver_to_public(&self, activity: &Value, public_inboxes: Vec<String>) -> Result<Vec<DeliveryResult>> {
+        info!("Delivering activity to {} public inboxes", public_inboxes.len());
+        Ok(self.deliver_to_inboxes(activity, public_inboxes).await)
+    }
+
+    // Functional utility for broadcast delivery
+    pub async fn broadcast_activity(
         &self,
-        activity: Value,
+        activity: &Value,
+        followers: Vec<String>,
         public_inboxes: Vec<String>,
-    ) -> Result<()> {
+    ) -> (Vec<DeliveryResult>, Vec<DeliveryResult>) {
+        let (follower_results, public_results) = futures::future::join(
+            self.deliver_to_followers(activity, followers),
+            self.deliver_to_public(activity, public_inboxes),
+        ).await;
+
+        (
+            follower_results.unwrap_or_default(),
+            public_results.unwrap_or_default(),
+        )
+    }
+
+    // Analyze delivery results functionally
+    pub fn analyze_results(results: &[DeliveryResult]) -> DeliveryAnalysis {
+        let total = results.len();
+        let successful = results.iter().filter(|r| r.success).count();
+        let failed = total - successful;
+        let errors: Vec<String> = results
+            .iter()
+            .filter_map(|r| r.error.as_ref())
+            .cloned()
+            .collect();
+
+        DeliveryAnalysis {
+            total,
+            successful,
+            failed,
+            success_rate: if total > 0 { successful as f64 / total as f64 } else { 0.0 },
+            errors,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DeliveryAnalysis {
+    pub total: usize,
+    pub successful: usize,
+    pub failed: usize,
+    pub success_rate: f64,
+    pub errors: Vec<String>,
+}
+
+impl DeliveryAnalysis {
+    pub fn is_success(&self) -> bool {
+        self.success_rate > 0.5
+    }
+
+    pub fn log_summary(&self) {
         info!(
-            "Delivering activity to {} public inboxes",
-            public_inboxes.len()
+            "Delivery summary: {}/{} successful ({:.1}%)",
+            self.successful,
+            self.total,
+            self.success_rate * 100.0
         );
 
-        for inbox in public_inboxes {
-            if let Err(e) = self.deliver_activity(&inbox, activity.clone()).await {
-                warn!("Failed to deliver to public inbox {}: {}", inbox, e);
-            }
+        if !self.errors.is_empty() {
+            warn!("Delivery errors: {:?}", self.errors);
         }
-
-        Ok(())
     }
+}
+
+// Functional constructors for common delivery patterns
+pub fn create_delivery_service(config: Config) -> DeliveryService {
+    DeliveryService::new(config)
 }
 
 #[cfg(test)]
@@ -94,7 +188,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn create_test_config() -> Config {
+    fn test_config() -> Config {
         Config {
             server_name: "Test Server".to_string(),
             server_url: "https://test.example.com".to_string(),
@@ -105,7 +199,7 @@ mod tests {
         }
     }
 
-    fn create_test_activity() -> Value {
+    fn test_activity() -> Value {
         json!({
             "@context": ["https://www.w3.org/ns/activitystreams"],
             "id": "https://test.example.com/activities/123",
@@ -116,216 +210,64 @@ mod tests {
                 "content": "Hello, world!",
                 "attributedTo": "https://test.example.com/users/alice"
             },
-            "to": ["https://www.w3.org/ns/activitystreams#Public"],
-            "cc": ["https://test.example.com/users/alice/followers"]
+            "to": ["https://www.w3.org/ns/activitystreams#Public"]
         })
     }
 
     #[test]
-    fn test_delivery_service_new() {
-        let config = create_test_config();
-        let service = DeliveryService::new(config.clone());
-
-        assert_eq!(service.config.server_name, config.server_name);
-        assert_eq!(service.config.server_url, config.server_url);
-        assert_eq!(service.config.port, config.port);
-        assert_eq!(service.config.actor_name, config.actor_name);
+    fn test_delivery_service_creation() {
+        let service = create_delivery_service(test_config());
+        assert_eq!(service.config.server_name, "Test Server");
     }
 
     #[test]
-    fn test_delivery_service_with_different_configs() {
-        let config1 = Config {
-            server_name: "Server 1".to_string(),
-            server_url: "https://server1.com".to_string(),
-            port: 8080,
-            actor_name: "alice".to_string(),
-            private_key_path: None,
-            public_key_path: None,
-        };
+    fn test_delivery_result_constructors() {
+        let success = DeliveryResult::success("https://example.com/inbox".to_string());
+        let failure = DeliveryResult::failure("https://example.com/inbox".to_string(), "Error".to_string());
 
-        let config2 = Config {
-            server_name: "Server 2".to_string(),
-            server_url: "https://server2.com".to_string(),
-            port: 9090,
-            actor_name: "bob".to_string(),
-            private_key_path: Some("/path/to/key".to_string()),
-            public_key_path: Some("/path/to/pub".to_string()),
-        };
-
-        let service1 = DeliveryService::new(config1.clone());
-        let service2 = DeliveryService::new(config2.clone());
-
-        assert_eq!(service1.config.server_name, "Server 1");
-        assert_eq!(service1.config.actor_name, "alice");
-        assert_eq!(service2.config.server_name, "Server 2");
-        assert_eq!(service2.config.actor_name, "bob");
-        assert_eq!(service2.config.port, 9090);
+        assert!(success.success);
+        assert!(success.error.is_none());
+        assert!(!failure.success);
+        assert!(failure.error.is_some());
     }
 
-    // Note: The following tests would require actual HTTP mocking to test properly.
-    // In a real-world scenario, you'd use a library like mockito or similar to mock HTTP responses.
-    // For now, we're testing the service creation and structure.
+    #[test]
+    fn test_delivery_analysis() {
+        let results = vec![
+            DeliveryResult::success("inbox1".to_string()),
+            DeliveryResult::success("inbox2".to_string()),
+            DeliveryResult::failure("inbox3".to_string(), "Error".to_string()),
+        ];
 
-    #[tokio::test]
-    async fn test_deliver_to_followers_empty_list() {
-        let config = create_test_config();
-        let service = DeliveryService::new(config);
-        let activity = create_test_activity();
-        let followers = vec![];
+        let analysis = DeliveryService::analyze_results(&results);
+        
+        assert_eq!(analysis.total, 3);
+        assert_eq!(analysis.successful, 2);
+        assert_eq!(analysis.failed, 1);
+        assert!((analysis.success_rate - 0.666).abs() < 0.01);
+        assert!(analysis.is_success());
+        assert_eq!(analysis.errors.len(), 1);
+    }
 
-        // This should complete without error even with empty followers list
-        let result = service.deliver_to_followers(activity, followers).await;
-        assert!(result.is_ok());
+    #[test]
+    fn test_delivery_analysis_empty() {
+        let analysis = DeliveryService::analyze_results(&[]);
+        
+        assert_eq!(analysis.total, 0);
+        assert_eq!(analysis.success_rate, 0.0);
+        assert!(!analysis.is_success());
     }
 
     #[tokio::test]
-    async fn test_deliver_to_public_empty_list() {
-        let config = create_test_config();
-        let service = DeliveryService::new(config);
-        let activity = create_test_activity();
-        let public_inboxes = vec![];
-
-        // This should complete without error even with empty inboxes list
-        let result = service.deliver_to_public(activity, public_inboxes).await;
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_activity_structure() {
-        let activity = create_test_activity();
-
-        assert_eq!(activity["type"], "Create");
-        assert_eq!(activity["actor"], "https://test.example.com/users/alice");
-        assert_eq!(activity["object"]["type"], "Note");
-        assert_eq!(activity["object"]["content"], "Hello, world!");
-        assert!(activity["to"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("https://www.w3.org/ns/activitystreams#Public")));
-    }
-
-    #[test]
-    fn test_complex_activity_creation() {
-        let complex_activity = json!({
-            "@context": [
-                "https://www.w3.org/ns/activitystreams",
-                "https://w3id.org/security/v1"
-            ],
-            "id": "https://mastodon.social/activities/123456",
-            "type": "Follow",
-            "actor": "https://mastodon.social/users/alice",
-            "object": "https://pleroma.instance/users/bob",
-            "to": ["https://pleroma.instance/users/bob"],
-            "cc": [],
-            "published": "2024-01-01T12:00:00Z",
-            "signature": {
-                "type": "RsaSignature2017",
-                "creator": "https://mastodon.social/users/alice#main-key",
-                "created": "2024-01-01T12:00:00Z",
-                "signatureValue": "signature..."
-            }
-        });
-
-        assert_eq!(complex_activity["type"], "Follow");
-        assert_eq!(
-            complex_activity["actor"],
-            "https://mastodon.social/users/alice"
-        );
-        assert_eq!(
-            complex_activity["object"],
-            "https://pleroma.instance/users/bob"
-        );
-        assert!(complex_activity["signature"]["type"] == "RsaSignature2017");
-    }
-
-    #[test]
-    fn test_multiple_followers_structure() {
-        let followers = [
-            "https://mastodon.social/users/alice/inbox".to_string(),
-            "https://pleroma.instance/users/bob/inbox".to_string(),
-            "https://misskey.io/users/charlie/inbox".to_string(),
-        ];
-
-        assert_eq!(followers.len(), 3);
-        assert!(followers.contains(&"https://mastodon.social/users/alice/inbox".to_string()));
-        assert!(followers.contains(&"https://pleroma.instance/users/bob/inbox".to_string()));
-        assert!(followers.contains(&"https://misskey.io/users/charlie/inbox".to_string()));
-    }
-
-    #[test]
-    fn test_public_inboxes_structure() {
-        let public_inboxes = [
-            "https://relay.fediverse.org/inbox".to_string(),
-            "https://relay.activitypub.org/inbox".to_string(),
-        ];
-
-        assert_eq!(public_inboxes.len(), 2);
-        assert!(public_inboxes.contains(&"https://relay.fediverse.org/inbox".to_string()));
-        assert!(public_inboxes.contains(&"https://relay.activitypub.org/inbox".to_string()));
-    }
-
-    #[test]
-    fn test_activity_cloning() {
-        let activity = create_test_activity();
-        let cloned_activity = activity.clone();
-
-        assert_eq!(activity, cloned_activity);
-        assert_eq!(activity["id"], cloned_activity["id"]);
-        assert_eq!(activity["type"], cloned_activity["type"]);
-        assert_eq!(activity["actor"], cloned_activity["actor"]);
-    }
-
-    #[test]
-    fn test_delivery_service_config_persistence() {
-        let original_config = create_test_config();
-        let service = DeliveryService::new(original_config.clone());
-
-        // Verify that the service maintains a copy of the config
-        assert_eq!(service.config.server_name, original_config.server_name);
-        assert_eq!(service.config.server_url, original_config.server_url);
-        assert_eq!(service.config.port, original_config.port);
-        assert_eq!(service.config.actor_name, original_config.actor_name);
-        assert_eq!(
-            service.config.private_key_path,
-            original_config.private_key_path
-        );
-        assert_eq!(
-            service.config.public_key_path,
-            original_config.public_key_path
-        );
-    }
-
-    // Test different activity types
-    #[test]
-    fn test_different_activity_types() {
-        let follow_activity = json!({
-            "type": "Follow",
-            "actor": "https://example.com/users/alice",
-            "object": "https://example.com/users/bob"
-        });
-
-        let accept_activity = json!({
-            "type": "Accept",
-            "actor": "https://example.com/users/bob",
-            "object": {
-                "type": "Follow",
-                "actor": "https://example.com/users/alice",
-                "object": "https://example.com/users/bob"
-            }
-        });
-
-        let undo_activity = json!({
-            "type": "Undo",
-            "actor": "https://example.com/users/alice",
-            "object": {
-                "type": "Follow",
-                "actor": "https://example.com/users/alice",
-                "object": "https://example.com/users/bob"
-            }
-        });
-
-        assert_eq!(follow_activity["type"], "Follow");
-        assert_eq!(accept_activity["type"], "Accept");
-        assert_eq!(undo_activity["type"], "Undo");
+    async fn test_functional_patterns() {
+        let service = create_delivery_service(test_config());
+        let activity = test_activity();
+        
+        // Test empty delivery
+        let results = service.deliver_to_inboxes(&activity, Vec::<String>::new()).await;
+        assert!(results.is_empty());
+        
+        let analysis = DeliveryService::analyze_results(&results);
+        assert_eq!(analysis.total, 0);
     }
 }

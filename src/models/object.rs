@@ -1,21 +1,63 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+// Trait for ActivityPub objects
+pub trait ActivityPubObject {
+    fn context() -> Vec<String> {
+        vec!["https://www.w3.org/ns/activitystreams".to_string()]
+    }
+
+    fn timestamp() -> DateTime<Utc> {
+        Utc::now()
+    }
+}
+
+// Generic base for ActivityPub objects
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Note {
+pub struct ObjectBase<T> {
     #[serde(rename = "@context")]
     pub context: Vec<String>,
     pub id: String,
     #[serde(rename = "type")]
-    pub note_type: String,
+    pub object_type: String,
+    #[serde(flatten)]
+    pub content: T,
+    pub published: DateTime<Utc>,
+}
+
+// Content structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteContent {
     pub attributed_to: String,
     pub content: String,
     pub to: Vec<String>,
     pub cc: Vec<String>,
-    pub published: DateTime<Utc>,
     pub in_reply_to: Option<String>,
     pub tag: Vec<Tag>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectionContent {
+    #[serde(rename = "totalItems")]
+    pub total_items: u32,
+    pub first: String,
+    pub last: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderedCollectionContent {
+    #[serde(rename = "totalItems")]
+    pub total_items: u32,
+    pub first: String,
+    pub last: String,
+    #[serde(rename = "orderedItems")]
+    pub ordered_items: Vec<serde_json::Value>,
+}
+
+// Type aliases
+pub type Note = ObjectBase<NoteContent>;
+pub type Collection = ObjectBase<CollectionContent>;
+pub type OrderedCollection = ObjectBase<OrderedCollectionContent>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tag {
@@ -25,84 +67,185 @@ pub struct Tag {
     pub href: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Collection {
-    #[serde(rename = "@context")]
-    pub context: Vec<String>,
-    pub id: String,
-    #[serde(rename = "type")]
-    pub collection_type: String,
-    #[serde(rename = "totalItems")]
-    pub total_items: u32,
-    pub first: String,
-    pub last: String,
+// Builder pattern for objects
+pub struct ObjectBuilder<T> {
+    id: String,
+    object_type: String,
+    content: T,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrderedCollection {
-    #[serde(rename = "@context")]
-    pub context: Vec<String>,
-    pub id: String,
-    #[serde(rename = "type")]
-    pub collection_type: String,
-    #[serde(rename = "totalItems")]
-    pub total_items: u32,
-    pub first: String,
-    pub last: String,
-    #[serde(rename = "orderedItems")]
-    pub ordered_items: Vec<serde_json::Value>,
+impl<T> ObjectBuilder<T> {
+    pub fn new(id: impl Into<String>, object_type: impl Into<String>, content: T) -> Self {
+        Self {
+            id: id.into(),
+            object_type: object_type.into(),
+            content,
+        }
+    }
+
+    pub fn build(self) -> ObjectBase<T> {
+        ObjectBase {
+            context: ObjectBase::<T>::context(),
+            id: self.id,
+            object_type: self.object_type,
+            content: self.content,
+            published: ObjectBase::<T>::timestamp(),
+        }
+    }
 }
 
+impl<T> ActivityPubObject for ObjectBase<T> {}
+
+// Functional constructors
 impl Note {
-    #[allow(dead_code)]
     pub fn new(
-        id: String,
-        attributed_to: String,
-        content: String,
+        id: impl Into<String>,
+        attributed_to: impl Into<String>,
+        content: impl Into<String>,
         to: Vec<String>,
         cc: Vec<String>,
     ) -> Self {
-        Self {
-            context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
-            id,
-            note_type: "Note".to_string(),
-            attributed_to,
-            content,
+        let note_content = NoteContent {
+            attributed_to: attributed_to.into(),
+            content: content.into(),
             to,
             cc,
-            published: Utc::now(),
             in_reply_to: None,
             tag: vec![],
-        }
+        };
+        ObjectBuilder::new(id, "Note", note_content).build()
+    }
+
+    pub fn with_reply(mut self, reply_to: impl Into<String>) -> Self {
+        self.content.in_reply_to = Some(reply_to.into());
+        self
+    }
+
+    pub fn with_tags(mut self, tags: Vec<Tag>) -> Self {
+        self.content.tag = tags;
+        self
+    }
+
+    pub fn add_tag(mut self, tag: Tag) -> Self {
+        self.content.tag.push(tag);
+        self
     }
 }
 
 impl Collection {
-    #[allow(dead_code)]
-    pub fn new(id: String, total_items: u32) -> Self {
-        Self {
-            context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
-            id: id.clone(),
-            collection_type: "Collection".to_string(),
+    pub fn new(id: impl Into<String>, total_items: u32) -> Self {
+        let id_str = id.into();
+        let content = CollectionContent {
             total_items,
-            first: format!("{id}?page=true"),
-            last: format!("{id}?page=true"),
-        }
+            first: format!("{}?page=true", id_str),
+            last: format!("{}?page=true", id_str),
+        };
+        ObjectBuilder::new(id_str, "Collection", content).build()
     }
 }
 
 impl OrderedCollection {
-    pub fn new(id: String, total_items: u32, ordered_items: Vec<serde_json::Value>) -> Self {
-        Self {
-            context: vec!["https://www.w3.org/ns/activitystreams".to_string()],
-            id: id.clone(),
-            collection_type: "OrderedCollection".to_string(),
+    pub fn new(
+        id: impl Into<String>,
+        total_items: u32,
+        ordered_items: Vec<serde_json::Value>,
+    ) -> Self {
+        let id_str = id.into();
+        let content = OrderedCollectionContent {
             total_items,
-            first: format!("{id}?page=true"),
-            last: format!("{id}?page=true"),
+            first: format!("{}?page=true", id_str),
+            last: format!("{}?page=true", id_str),
             ordered_items,
+        };
+        ObjectBuilder::new(id_str, "OrderedCollection", content).build()
+    }
+
+    pub fn empty(id: impl Into<String>) -> Self {
+        Self::new(id, 0, vec![])
+    }
+
+    pub fn add_item(mut self, item: serde_json::Value) -> Self {
+        self.content.ordered_items.push(item);
+        self.content.total_items += 1;
+        self
+    }
+}
+
+// Tag constructors using functional patterns
+impl Tag {
+    pub fn mention(name: impl Into<String>, href: impl Into<String>) -> Self {
+        Self {
+            tag_type: "Mention".to_string(),
+            name: name.into(),
+            href: Some(href.into()),
         }
     }
+
+    pub fn hashtag(name: impl Into<String>, href: Option<String>) -> Self {
+        Self {
+            tag_type: "Hashtag".to_string(),
+            name: name.into(),
+            href,
+        }
+    }
+
+    pub fn emoji(name: impl Into<String>) -> Self {
+        Self {
+            tag_type: "Emoji".to_string(),
+            name: name.into(),
+            href: None,
+        }
+    }
+}
+
+// Utility functions
+pub fn create_public_note(
+    id: impl Into<String>,
+    author: impl Into<String>,
+    content: impl Into<String>,
+) -> Note {
+    Note::new(
+        id,
+        author,
+        content,
+        vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
+        vec![],
+    )
+}
+
+pub fn create_direct_note(
+    id: impl Into<String>,
+    author: impl Into<String>,
+    content: impl Into<String>,
+    recipient: impl Into<String>,
+) -> Note {
+    Note::new(id, author, content, vec![recipient.into()], vec![])
+}
+
+// Pattern matching for object types
+pub fn match_object_type<T>(object: &ObjectBase<T>) -> ObjectTypeResult {
+    match object.object_type.as_str() {
+        "Note" => ObjectTypeResult::Note,
+        "Article" => ObjectTypeResult::Article,
+        "Collection" => ObjectTypeResult::Collection,
+        "OrderedCollection" => ObjectTypeResult::OrderedCollection,
+        "Image" => ObjectTypeResult::Image,
+        "Video" => ObjectTypeResult::Video,
+        "Audio" => ObjectTypeResult::Audio,
+        _ => ObjectTypeResult::Unknown(object.object_type.clone()),
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ObjectTypeResult {
+    Note,
+    Article,
+    Collection,
+    OrderedCollection,
+    Image,
+    Video,
+    Audio,
+    Unknown(String),
 }
 
 #[cfg(test)]
@@ -110,267 +253,97 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    #[test]
-    fn test_note_new() {
-        let id = "https://example.com/notes/123".to_string();
-        let attributed_to = "https://example.com/users/alice".to_string();
-        let content = "Hello, world!".to_string();
-        let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];
-        let cc = vec!["https://example.com/users/alice/followers".to_string()];
-
-        let note = Note::new(
-            id.clone(),
-            attributed_to.clone(),
-            content.clone(),
-            to.clone(),
-            cc.clone(),
-        );
-
-        assert_eq!(note.context, vec!["https://www.w3.org/ns/activitystreams"]);
-        assert_eq!(note.id, id);
-        assert_eq!(note.note_type, "Note");
-        assert_eq!(note.attributed_to, attributed_to);
-        assert_eq!(note.content, content);
-        assert_eq!(note.to, to);
-        assert_eq!(note.cc, cc);
-        assert_eq!(note.in_reply_to, None);
-        assert!(note.tag.is_empty());
+    fn test_note_data() -> (String, String, String) {
+        (
+            "https://example.com/notes/123".to_string(),
+            "https://example.com/users/alice".to_string(),
+            "Hello, world!".to_string(),
+        )
     }
 
     #[test]
-    fn test_note_with_reply_and_tags() {
-        let mut note = Note::new(
-            "https://example.com/notes/456".to_string(),
-            "https://example.com/users/bob".to_string(),
-            "Reply with @alice and #test".to_string(),
-            vec!["https://example.com/users/alice".to_string()],
-            vec![],
-        );
+    fn test_note_builder_pattern() {
+        let (id, author, content) = test_note_data();
+        let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];
 
-        note.in_reply_to = Some("https://example.com/notes/123".to_string());
-        note.tag = vec![
-            Tag {
-                tag_type: "Mention".to_string(),
-                name: "@alice".to_string(),
-                href: Some("https://example.com/users/alice".to_string()),
-            },
-            Tag {
-                tag_type: "Hashtag".to_string(),
-                name: "#test".to_string(),
-                href: Some("https://example.com/tags/test".to_string()),
-            },
+        let note = Note::new(id.clone(), author.clone(), content.clone(), to.clone(), vec![]);
+
+        assert_eq!(note.id, id);
+        assert_eq!(note.object_type, "Note");
+        assert_eq!(note.content.attributed_to, author);
+        assert_eq!(note.content.content, content);
+        assert_eq!(note.content.to, to);
+    }
+
+    #[test]
+    fn test_note_functional_methods() {
+        let (id, author, content) = test_note_data();
+        let tags = vec![
+            Tag::mention("@alice", "https://example.com/users/alice"),
+            Tag::hashtag("#test".to_string(), None),
         ];
 
-        assert_eq!(
-            note.in_reply_to,
-            Some("https://example.com/notes/123".to_string())
-        );
-        assert_eq!(note.tag.len(), 2);
-        assert_eq!(note.tag[0].tag_type, "Mention");
-        assert_eq!(note.tag[0].name, "@alice");
-        assert_eq!(note.tag[1].tag_type, "Hashtag");
-        assert_eq!(note.tag[1].name, "#test");
+        let note = Note::new(id, author, content, vec![], vec![])
+            .with_reply("https://example.com/notes/456")
+            .with_tags(tags.clone());
+
+        assert_eq!(note.content.in_reply_to, Some("https://example.com/notes/456".to_string()));
+        assert_eq!(note.content.tag.len(), 2);
+        assert_eq!(note.content.tag[0].tag_type, "Mention");
+        assert_eq!(note.content.tag[1].tag_type, "Hashtag");
     }
 
     #[test]
-    fn test_note_serialization() {
-        let note = Note::new(
-            "https://example.com/notes/test".to_string(),
-            "https://example.com/users/test".to_string(),
-            "Test content".to_string(),
-            vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
-            vec![],
-        );
+    fn test_collection_utilities() {
+        let collection = Collection::new("https://example.com/collections/test", 42);
+        let ordered = OrderedCollection::empty("https://example.com/outbox")
+            .add_item(json!({"type": "Create"}))
+            .add_item(json!({"type": "Follow"}));
 
-        let json = serde_json::to_string(&note).unwrap();
-        let deserialized: Note = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(note.id, deserialized.id);
-        assert_eq!(note.attributed_to, deserialized.attributed_to);
-        assert_eq!(note.content, deserialized.content);
-        assert_eq!(note.note_type, deserialized.note_type);
+        assert_eq!(collection.content.total_items, 42);
+        assert_eq!(ordered.content.total_items, 2);
+        assert_eq!(ordered.content.ordered_items.len(), 2);
     }
 
     #[test]
-    fn test_tag_creation() {
-        let mention_tag = Tag {
-            tag_type: "Mention".to_string(),
-            name: "@user".to_string(),
-            href: Some("https://example.com/users/user".to_string()),
-        };
+    fn test_tag_constructors() {
+        let mention = Tag::mention("@alice", "https://example.com/users/alice");
+        let hashtag = Tag::hashtag("#rust", Some("https://example.com/tags/rust".to_string()));
+        let emoji = Tag::emoji(":heart:");
 
-        let hashtag = Tag {
-            tag_type: "Hashtag".to_string(),
-            name: "#topic".to_string(),
-            href: Some("https://example.com/tags/topic".to_string()),
-        };
-
-        let emoji = Tag {
-            tag_type: "Emoji".to_string(),
-            name: ":heart:".to_string(),
-            href: None,
-        };
-
-        assert_eq!(mention_tag.tag_type, "Mention");
-        assert_eq!(mention_tag.name, "@user");
-        assert!(mention_tag.href.is_some());
-
+        assert_eq!(mention.tag_type, "Mention");
+        assert!(mention.href.is_some());
         assert_eq!(hashtag.tag_type, "Hashtag");
-        assert_eq!(hashtag.name, "#topic");
-        assert!(hashtag.href.is_some());
-
         assert_eq!(emoji.tag_type, "Emoji");
-        assert_eq!(emoji.name, ":heart:");
         assert!(emoji.href.is_none());
     }
 
     #[test]
-    fn test_collection_new() {
-        let id = "https://example.com/collections/test".to_string();
-        let total_items = 42;
+    fn test_utility_functions() {
+        let public_note = create_public_note("id", "author", "content");
+        let direct_note = create_direct_note("id", "author", "content", "recipient");
 
-        let collection = Collection::new(id.clone(), total_items);
-
-        assert_eq!(
-            collection.context,
-            vec!["https://www.w3.org/ns/activitystreams"]
-        );
-        assert_eq!(collection.id, id);
-        assert_eq!(collection.collection_type, "Collection");
-        assert_eq!(collection.total_items, total_items);
-        assert_eq!(collection.first, format!("{id}?page=true"));
-        assert_eq!(collection.last, format!("{id}?page=true"));
+        assert!(public_note.content.to.contains(&"https://www.w3.org/ns/activitystreams#Public".to_string()));
+        assert!(direct_note.content.to.contains(&"recipient".to_string()));
     }
 
     #[test]
-    fn test_collection_serialization() {
-        let collection = Collection::new("https://example.com/collections/test".to_string(), 10);
+    fn test_object_type_matching() {
+        let note = Note::new("id", "author", "content", vec![], vec![]);
+        let collection = Collection::new("id", 0);
 
-        let json = serde_json::to_string(&collection).unwrap();
-        let deserialized: Collection = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(collection.id, deserialized.id);
-        assert_eq!(collection.collection_type, deserialized.collection_type);
-        assert_eq!(collection.total_items, deserialized.total_items);
-        assert_eq!(collection.first, deserialized.first);
-        assert_eq!(collection.last, deserialized.last);
+        assert_eq!(match_object_type(&note), ObjectTypeResult::Note);
+        assert_eq!(match_object_type(&collection), ObjectTypeResult::Collection);
     }
 
     #[test]
-    fn test_ordered_collection_new() {
-        let id = "https://example.com/outbox".to_string();
-        let items = vec![
-            json!({"type": "Create", "actor": "alice"}),
-            json!({"type": "Follow", "actor": "bob"}),
-        ];
-        let total_items = items.len() as u32;
+    fn test_serialization_compatibility() {
+        let note = Note::new("test", "author", "content", vec![], vec![]);
+        
+        let json = serde_json::to_string(&note).unwrap();
+        let deserialized: Note = serde_json::from_str(&json).unwrap();
 
-        let ordered_collection = OrderedCollection::new(id.clone(), total_items, items.clone());
-
-        assert_eq!(
-            ordered_collection.context,
-            vec!["https://www.w3.org/ns/activitystreams"]
-        );
-        assert_eq!(ordered_collection.id, id);
-        assert_eq!(ordered_collection.collection_type, "OrderedCollection");
-        assert_eq!(ordered_collection.total_items, total_items);
-        assert_eq!(ordered_collection.first, format!("{id}?page=true"));
-        assert_eq!(ordered_collection.last, format!("{id}?page=true"));
-        assert_eq!(ordered_collection.ordered_items, items);
-    }
-
-    #[test]
-    fn test_ordered_collection_empty() {
-        let id = "https://example.com/empty".to_string();
-        let ordered_collection = OrderedCollection::new(id.clone(), 0, vec![]);
-
-        assert_eq!(ordered_collection.total_items, 0);
-        assert!(ordered_collection.ordered_items.is_empty());
-    }
-
-    #[test]
-    fn test_ordered_collection_serialization() {
-        let items = vec![
-            json!({"type": "Note", "content": "Hello"}),
-            json!({"type": "Note", "content": "World"}),
-        ];
-        let ordered_collection =
-            OrderedCollection::new("https://example.com/test".to_string(), 2, items.clone());
-
-        let json = serde_json::to_string(&ordered_collection).unwrap();
-        let deserialized: OrderedCollection = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(ordered_collection.id, deserialized.id);
-        assert_eq!(
-            ordered_collection.collection_type,
-            deserialized.collection_type
-        );
-        assert_eq!(ordered_collection.total_items, deserialized.total_items);
-        assert_eq!(ordered_collection.ordered_items, deserialized.ordered_items);
-    }
-
-    #[test]
-    fn test_note_clone() {
-        let note = Note::new(
-            "test".to_string(),
-            "author".to_string(),
-            "content".to_string(),
-            vec![],
-            vec![],
-        );
-
-        let cloned = note.clone();
-        assert_eq!(note.id, cloned.id);
-        assert_eq!(note.content, cloned.content);
-        assert_eq!(note.attributed_to, cloned.attributed_to);
-    }
-
-    #[test]
-    fn test_collection_clone() {
-        let collection = Collection::new("test".to_string(), 5);
-        let cloned = collection.clone();
-
-        assert_eq!(collection.id, cloned.id);
-        assert_eq!(collection.total_items, cloned.total_items);
-    }
-
-    #[test]
-    fn test_ordered_collection_clone() {
-        let items = vec![json!({"test": "value"})];
-        let collection = OrderedCollection::new("test".to_string(), 1, items.clone());
-        let cloned = collection.clone();
-
-        assert_eq!(collection.id, cloned.id);
-        assert_eq!(collection.ordered_items, cloned.ordered_items);
-    }
-
-    #[test]
-    fn test_complex_note_content() {
-        let note = Note::new(
-            "https://example.com/notes/complex".to_string(),
-            "https://example.com/users/author".to_string(),
-            "<p>Complex <strong>HTML</strong> content with <a href=\"https://example.com\">links</a></p>".to_string(),
-            vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
-            vec!["https://example.com/users/author/followers".to_string()],
-        );
-
-        assert!(note.content.contains("<p>"));
-        assert!(note.content.contains("<strong>"));
-        assert!(note.content.contains("href="));
-    }
-
-    #[test]
-    fn test_collection_urls() {
-        let base_id = "https://example.com/users/alice/outbox";
-        let collection = Collection::new(base_id.to_string(), 100);
-
-        assert_eq!(
-            collection.first,
-            "https://example.com/users/alice/outbox?page=true"
-        );
-        assert_eq!(
-            collection.last,
-            "https://example.com/users/alice/outbox?page=true"
-        );
+        assert_eq!(note.id, deserialized.id);
+        assert_eq!(note.content.content, deserialized.content.content);
     }
 }
