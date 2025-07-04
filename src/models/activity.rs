@@ -149,7 +149,10 @@ mod tests {
             cc.clone(),
         );
 
-        assert_eq!(activity.context, vec!["https://www.w3.org/ns/activitystreams"]);
+        assert_eq!(
+            activity.context,
+            vec!["https://www.w3.org/ns/activitystreams"]
+        );
         assert!(activity.id.starts_with("https://example.com/activities/"));
         assert_eq!(activity.activity_type, activity_type);
         assert_eq!(activity.actor, actor);
@@ -171,7 +174,10 @@ mod tests {
 
         let create = Create::new(actor.clone(), object.clone(), to.clone(), cc.clone());
 
-        assert_eq!(create.context, vec!["https://www.w3.org/ns/activitystreams"]);
+        assert_eq!(
+            create.context,
+            vec!["https://www.w3.org/ns/activitystreams"]
+        );
         assert!(create.id.starts_with("https://example.com/activities/"));
         assert_eq!(create.activity_type, "Create");
         assert_eq!(create.actor, actor);
@@ -189,7 +195,10 @@ mod tests {
 
         let follow = Follow::new(actor.clone(), object.clone(), to.clone(), cc.clone());
 
-        assert_eq!(follow.context, vec!["https://www.w3.org/ns/activitystreams"]);
+        assert_eq!(
+            follow.context,
+            vec!["https://www.w3.org/ns/activitystreams"]
+        );
         assert!(follow.id.starts_with("https://example.com/activities/"));
         assert_eq!(follow.activity_type, "Follow");
         assert_eq!(follow.actor, actor);
@@ -211,7 +220,10 @@ mod tests {
 
         let accept = Accept::new(actor.clone(), follow_object.clone(), to.clone(), cc.clone());
 
-        assert_eq!(accept.context, vec!["https://www.w3.org/ns/activitystreams"]);
+        assert_eq!(
+            accept.context,
+            vec!["https://www.w3.org/ns/activitystreams"]
+        );
         assert!(accept.id.starts_with("https://example.com/activities/"));
         assert_eq!(accept.activity_type, "Accept");
         assert_eq!(accept.actor, actor);
@@ -350,7 +362,13 @@ mod tests {
         );
 
         assert_eq!(create.object, complex_object);
-        assert_eq!(create.to, vec!["https://www.w3.org/ns/activitystreams#Public"]);
-        assert_eq!(create.cc, vec!["https://example.com/users/author/followers"]);
+        assert_eq!(
+            create.to,
+            vec!["https://www.w3.org/ns/activitystreams#Public"]
+        );
+        assert_eq!(
+            create.cc,
+            vec!["https://example.com/users/author/followers"]
+        );
     }
 }
