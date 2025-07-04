@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -110,20 +111,6 @@ impl Activity {
     }
 }
 
-impl Create {
-    pub fn new(
-        actor: impl Into<String>,
-        object: serde_json::Value,
-        to: Vec<String>,
-        cc: Vec<String>,
-    ) -> Self {
-        ActivityBuilder::new("Create", actor, object)
-            .to(to)
-            .cc(cc)
-            .build()
-    }
-}
-
 impl Follow {
     pub fn new(
         actor: impl Into<String>,
@@ -138,18 +125,23 @@ impl Follow {
     }
 }
 
-impl Accept {
-    pub fn new(
-        actor: impl Into<String>,
-        object: serde_json::Value,
-        to: Vec<String>,
-        cc: Vec<String>,
-    ) -> Self {
-        ActivityBuilder::new("Accept", actor, object)
-            .to(to)
-            .cc(cc)
-            .build()
-    }
+// Factory functions for specific activity types
+pub fn create_activity(
+    actor: impl Into<String>,
+    object: serde_json::Value,
+    to: Vec<String>,
+    cc: Vec<String>,
+) -> Create {
+    Activity::new("Create", actor, object, to, cc)
+}
+
+pub fn accept_activity(
+    actor: impl Into<String>,
+    object: serde_json::Value,
+    to: Vec<String>,
+    cc: Vec<String>,
+) -> Accept {
+    Activity::new("Accept", actor, object, to, cc)
 }
 
 // Functional utilities
@@ -239,10 +231,25 @@ mod tests {
     #[test]
     fn test_functional_constructors() {
         let (to, cc) = test_recipients();
-        
-        let create = Create::new(test_actor(), json!({"content": "test"}), to.clone(), cc.clone());
-        let follow = Follow::new(test_actor(), "https://example.com/users/bob", to.clone(), cc.clone());
-        let accept = Accept::new(test_actor(), json!({"type": "Follow"}), to.clone(), cc.clone());
+
+        let create = create_activity(
+            test_actor(),
+            json!({"content": "test"}),
+            to.clone(),
+            cc.clone(),
+        );
+        let follow = Follow::new(
+            test_actor(),
+            "https://example.com/users/bob",
+            to.clone(),
+            cc.clone(),
+        );
+        let accept = accept_activity(
+            test_actor(),
+            json!({"type": "Follow"}),
+            to.clone(),
+            cc.clone(),
+        );
 
         assert_eq!(create.object_type, "Create");
         assert_eq!(follow.object_type, "Follow");
@@ -252,16 +259,25 @@ mod tests {
     #[test]
     fn test_public_activity_helper() {
         let activity = create_public_activity("Create", test_actor(), json!({"content": "public"}));
-        
-        assert!(activity.to.contains(&"https://www.w3.org/ns/activitystreams#Public".to_string()));
+
+        assert!(activity
+            .to
+            .contains(&"https://www.w3.org/ns/activitystreams#Public".to_string()));
         assert_eq!(activity.object_type, "Create");
     }
 
     #[test]
     fn test_direct_activity_helper() {
-        let activity = create_direct_activity("Follow", test_actor(), "target".to_string(), "https://example.com/users/bob");
-        
-        assert!(activity.to.contains(&"https://example.com/users/bob".to_string()));
+        let activity = create_direct_activity(
+            "Follow",
+            test_actor(),
+            "target".to_string(),
+            "https://example.com/users/bob",
+        );
+
+        assert!(activity
+            .to
+            .contains(&"https://example.com/users/bob".to_string()));
         assert_eq!(activity.object_type, "Follow");
     }
 
@@ -271,7 +287,10 @@ mod tests {
             ("Create", ActivityTypeResult::Create),
             ("Follow", ActivityTypeResult::Follow),
             ("Accept", ActivityTypeResult::Accept),
-            ("CustomType", ActivityTypeResult::Unknown("CustomType".to_string())),
+            (
+                "CustomType",
+                ActivityTypeResult::Unknown("CustomType".to_string()),
+            ),
         ];
 
         for (activity_type, expected) in activities {
@@ -290,14 +309,18 @@ mod tests {
 
         assert_eq!(activity.to.len(), 2);
         assert_eq!(activity.cc.len(), 1);
-        assert!(activity.to.contains(&"https://example.com/users/bob".to_string()));
-        assert!(activity.to.contains(&"https://example.com/users/charlie".to_string()));
+        assert!(activity
+            .to
+            .contains(&"https://example.com/users/bob".to_string()));
+        assert!(activity
+            .to
+            .contains(&"https://example.com/users/charlie".to_string()));
     }
 
     #[test]
     fn test_activity_serialization() {
-        let activity = Create::new(test_actor(), json!({"content": "test"}), vec![], vec![]);
-        
+        let activity = create_activity(test_actor(), json!({"content": "test"}), vec![], vec![]);
+
         let json = serde_json::to_string(&activity).unwrap();
         let deserialized: Create = serde_json::from_str(&json).unwrap();
 

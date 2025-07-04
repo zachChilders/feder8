@@ -1,12 +1,14 @@
+#![allow(dead_code)]
 use crate::config::Config;
 use anyhow::Result;
 use reqwest::Client;
 use serde_json::Value;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 #[derive(Clone)]
 pub struct DeliveryService {
     client: Client,
+    #[allow(dead_code)]
     config: Config,
 }
 
@@ -45,7 +47,11 @@ impl DeliveryService {
     }
 
     // Core delivery method with functional error handling
-    pub async fn deliver_activity(&self, inbox_url: &str, activity: &Value) -> Result<DeliveryResult> {
+    pub async fn deliver_activity(
+        &self,
+        inbox_url: &str,
+        activity: &Value,
+    ) -> Result<DeliveryResult> {
         info!("Delivering activity to inbox: {}", inbox_url);
 
         let response = self
@@ -71,9 +77,12 @@ impl DeliveryService {
             }
             false => {
                 let status = response.status();
-                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-                let error_msg = format!("HTTP {}: {}", status, error_text);
-                
+                let error_text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "Unknown error".to_string());
+                let error_msg = format!("HTTP {status}: {error_text}");
+
                 warn!("Failed to deliver activity to {}: {}", inbox_url, error_msg);
                 Ok(DeliveryResult::failure(inbox_url.to_string(), error_msg))
             }
@@ -86,28 +95,46 @@ impl DeliveryService {
         activity: &Value,
         inboxes: impl IntoIterator<Item = impl AsRef<str>>,
     ) -> Vec<DeliveryResult> {
-        let futures = inboxes
+        let inbox_urls: Vec<String> = inboxes
             .into_iter()
-            .map(|inbox| self.deliver_activity(inbox.as_ref(), activity));
+            .map(|inbox| inbox.as_ref().to_string())
+            .collect();
+
+        let futures = inbox_urls
+            .iter()
+            .map(|inbox_url| self.deliver_activity(inbox_url, activity));
 
         // Execute all deliveries in parallel and collect results
         futures::future::join_all(futures)
             .await
             .into_iter()
-            .map(|result| result.unwrap_or_else(|e| {
-                DeliveryResult::failure("unknown".to_string(), e.to_string())
-            }))
+            .map(|result| {
+                result.unwrap_or_else(|e| {
+                    DeliveryResult::failure("unknown".to_string(), e.to_string())
+                })
+            })
             .collect()
     }
 
     // Simplified delivery methods using the core function
-    pub async fn deliver_to_followers(&self, activity: &Value, followers: Vec<String>) -> Result<Vec<DeliveryResult>> {
+    pub async fn deliver_to_followers(
+        &self,
+        activity: &Value,
+        followers: Vec<String>,
+    ) -> Result<Vec<DeliveryResult>> {
         info!("Delivering activity to {} followers", followers.len());
         Ok(self.deliver_to_inboxes(activity, followers).await)
     }
 
-    pub async fn deliver_to_public(&self, activity: &Value, public_inboxes: Vec<String>) -> Result<Vec<DeliveryResult>> {
-        info!("Delivering activity to {} public inboxes", public_inboxes.len());
+    pub async fn deliver_to_public(
+        &self,
+        activity: &Value,
+        public_inboxes: Vec<String>,
+    ) -> Result<Vec<DeliveryResult>> {
+        info!(
+            "Delivering activity to {} public inboxes",
+            public_inboxes.len()
+        );
         Ok(self.deliver_to_inboxes(activity, public_inboxes).await)
     }
 
@@ -121,7 +148,8 @@ impl DeliveryService {
         let (follower_results, public_results) = futures::future::join(
             self.deliver_to_followers(activity, followers),
             self.deliver_to_public(activity, public_inboxes),
-        ).await;
+        )
+        .await;
 
         (
             follower_results.unwrap_or_default(),
@@ -144,7 +172,11 @@ impl DeliveryService {
             total,
             successful,
             failed,
-            success_rate: if total > 0 { successful as f64 / total as f64 } else { 0.0 },
+            success_rate: if total > 0 {
+                successful as f64 / total as f64
+            } else {
+                0.0
+            },
             errors,
         }
     }
@@ -223,7 +255,8 @@ mod tests {
     #[test]
     fn test_delivery_result_constructors() {
         let success = DeliveryResult::success("https://example.com/inbox".to_string());
-        let failure = DeliveryResult::failure("https://example.com/inbox".to_string(), "Error".to_string());
+        let failure =
+            DeliveryResult::failure("https://example.com/inbox".to_string(), "Error".to_string());
 
         assert!(success.success);
         assert!(success.error.is_none());
@@ -240,7 +273,7 @@ mod tests {
         ];
 
         let analysis = DeliveryService::analyze_results(&results);
-        
+
         assert_eq!(analysis.total, 3);
         assert_eq!(analysis.successful, 2);
         assert_eq!(analysis.failed, 1);
@@ -252,7 +285,7 @@ mod tests {
     #[test]
     fn test_delivery_analysis_empty() {
         let analysis = DeliveryService::analyze_results(&[]);
-        
+
         assert_eq!(analysis.total, 0);
         assert_eq!(analysis.success_rate, 0.0);
         assert!(!analysis.is_success());
@@ -262,11 +295,13 @@ mod tests {
     async fn test_functional_patterns() {
         let service = create_delivery_service(test_config());
         let activity = test_activity();
-        
+
         // Test empty delivery
-        let results = service.deliver_to_inboxes(&activity, Vec::<String>::new()).await;
+        let results = service
+            .deliver_to_inboxes(&activity, Vec::<String>::new())
+            .await;
         assert!(results.is_empty());
-        
+
         let analysis = DeliveryService::analyze_results(&results);
         assert_eq!(analysis.total, 0);
     }

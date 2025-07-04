@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -98,7 +99,7 @@ impl ActorBuilder {
 
     pub fn build(self) -> Actor {
         let actor_id = format!("{}/users/{}", self.server_url, self.username);
-        
+
         Actor {
             context: Actor::context(),
             id: actor_id.clone(),
@@ -107,12 +108,12 @@ impl ActorBuilder {
             preferred_username: self.username,
             summary: self.summary,
             url: actor_id.clone(),
-            inbox: format!("{}/inbox", actor_id),
-            outbox: format!("{}/outbox", actor_id),
-            followers: format!("{}/followers", actor_id),
-            following: format!("{}/following", actor_id),
+            inbox: format!("{actor_id}/inbox"),
+            outbox: format!("{actor_id}/outbox"),
+            followers: format!("{actor_id}/followers"),
+            following: format!("{actor_id}/following"),
             public_key: PublicKey {
-                id: format!("{}#main-key", actor_id),
+                id: format!("{actor_id}#main-key"),
                 key_type: "Key".to_string(),
                 owner: actor_id,
                 public_key_pem: self.public_key_pem,
@@ -200,13 +201,10 @@ impl Icon {
 
 // PublicKey constructors
 impl PublicKey {
-    pub fn new(
-        owner: impl Into<String>,
-        public_key_pem: impl Into<String>,
-    ) -> Self {
+    pub fn new(owner: impl Into<String>, public_key_pem: impl Into<String>) -> Self {
         let owner_str = owner.into();
         Self {
-            id: format!("{}#main-key", owner_str),
+            id: format!("{owner_str}#main-key"),
             key_type: "Key".to_string(),
             owner: owner_str,
             public_key_pem: public_key_pem.into(),
@@ -299,11 +297,16 @@ mod tests {
     #[test]
     fn test_actor_builder_pattern() {
         let (name, username, server_url, key) = test_actor_data();
-        
-        let actor = ActorBuilder::new(name.clone(), username.clone(), server_url.clone(), key.clone())
-            .with_summary("Test summary")
-            .with_icon(Icon::png("https://example.com/avatar.png"))
-            .build();
+
+        let actor = ActorBuilder::new(
+            name.clone(),
+            username.clone(),
+            server_url.clone(),
+            key.clone(),
+        )
+        .with_summary("Test summary")
+        .with_icon(Icon::png("https://example.com/avatar.png"))
+        .build();
 
         assert_eq!(actor.name, name);
         assert_eq!(actor.preferred_username, username);
@@ -314,9 +317,19 @@ mod tests {
     #[test]
     fn test_functional_constructors() {
         let (name, username, server_url, key) = test_actor_data();
-        
-        let person = create_person_actor(name.clone(), username.clone(), server_url.clone(), key.clone());
-        let service = create_service_actor(name.clone(), username.clone(), server_url.clone(), key.clone());
+
+        let person = create_person_actor(
+            name.clone(),
+            username.clone(),
+            server_url.clone(),
+            key.clone(),
+        );
+        let service = create_service_actor(
+            name.clone(),
+            username.clone(),
+            server_url.clone(),
+            key.clone(),
+        );
         let bot = create_bot_actor(name, username, server_url, key);
 
         assert_eq!(person.actor_type, "Person");
@@ -344,14 +357,22 @@ mod tests {
         assert_eq!(urls.actor, "https://example.com/users/testuser");
         assert_eq!(urls.inbox, "https://example.com/users/testuser/inbox");
         assert_eq!(urls.outbox, "https://example.com/users/testuser/outbox");
-        assert_eq!(urls.public_key, "https://example.com/users/testuser#main-key");
+        assert_eq!(
+            urls.public_key,
+            "https://example.com/users/testuser#main-key"
+        );
     }
 
     #[test]
     fn test_actor_type_matching() {
         let (name, username, server_url, key) = test_actor_data();
-        
-        let person = create_person_actor(name.clone(), username.clone(), server_url.clone(), key.clone());
+
+        let person = create_person_actor(
+            name.clone(),
+            username.clone(),
+            server_url.clone(),
+            key.clone(),
+        );
         let service = create_service_actor(name, username, server_url, key);
 
         assert_eq!(match_actor_type(&person), ActorTypeResult::Person);
@@ -361,7 +382,8 @@ mod tests {
     #[test]
     fn test_public_key_constructors() {
         let key1 = PublicKey::new("https://example.com/users/alice", "test-key");
-        let key2 = PublicKey::with_custom_id("custom-id", "https://example.com/users/bob", "test-key");
+        let key2 =
+            PublicKey::with_custom_id("custom-id", "https://example.com/users/bob", "test-key");
 
         assert_eq!(key1.id, "https://example.com/users/alice#main-key");
         assert_eq!(key1.owner, "https://example.com/users/alice");
@@ -371,7 +393,7 @@ mod tests {
     #[test]
     fn test_actor_functional_methods() {
         let (name, username, server_url, key) = test_actor_data();
-        
+
         let actor = create_person_actor(name, username, server_url, key)
             .with_summary("Updated summary")
             .with_icon(Icon::jpeg("https://example.com/new-avatar.jpg"));

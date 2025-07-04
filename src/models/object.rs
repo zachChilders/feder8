@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -137,8 +138,8 @@ impl Collection {
         let id_str = id.into();
         let content = CollectionContent {
             total_items,
-            first: format!("{}?page=true", id_str),
-            last: format!("{}?page=true", id_str),
+            first: format!("{id_str}?page=true"),
+            last: format!("{id_str}?page=true"),
         };
         ObjectBuilder::new(id_str, "Collection", content).build()
     }
@@ -153,8 +154,8 @@ impl OrderedCollection {
         let id_str = id.into();
         let content = OrderedCollectionContent {
             total_items,
-            first: format!("{}?page=true", id_str),
-            last: format!("{}?page=true", id_str),
+            first: format!("{id_str}?page=true"),
+            last: format!("{id_str}?page=true"),
             ordered_items,
         };
         ObjectBuilder::new(id_str, "OrderedCollection", content).build()
@@ -266,7 +267,13 @@ mod tests {
         let (id, author, content) = test_note_data();
         let to = vec!["https://www.w3.org/ns/activitystreams#Public".to_string()];
 
-        let note = Note::new(id.clone(), author.clone(), content.clone(), to.clone(), vec![]);
+        let note = Note::new(
+            id.clone(),
+            author.clone(),
+            content.clone(),
+            to.clone(),
+            vec![],
+        );
 
         assert_eq!(note.id, id);
         assert_eq!(note.object_type, "Note");
@@ -287,7 +294,10 @@ mod tests {
             .with_reply("https://example.com/notes/456")
             .with_tags(tags.clone());
 
-        assert_eq!(note.content.in_reply_to, Some("https://example.com/notes/456".to_string()));
+        assert_eq!(
+            note.content.in_reply_to,
+            Some("https://example.com/notes/456".to_string())
+        );
         assert_eq!(note.content.tag.len(), 2);
         assert_eq!(note.content.tag[0].tag_type, "Mention");
         assert_eq!(note.content.tag[1].tag_type, "Hashtag");
@@ -323,7 +333,10 @@ mod tests {
         let public_note = create_public_note("id", "author", "content");
         let direct_note = create_direct_note("id", "author", "content", "recipient");
 
-        assert!(public_note.content.to.contains(&"https://www.w3.org/ns/activitystreams#Public".to_string()));
+        assert!(public_note
+            .content
+            .to
+            .contains(&"https://www.w3.org/ns/activitystreams#Public".to_string()));
         assert!(direct_note.content.to.contains(&"recipient".to_string()));
     }
 
@@ -339,7 +352,7 @@ mod tests {
     #[test]
     fn test_serialization_compatibility() {
         let note = Note::new("test", "author", "content", vec![], vec![]);
-        
+
         let json = serde_json::to_string(&note).unwrap();
         let deserialized: Note = serde_json::from_str(&json).unwrap();
 

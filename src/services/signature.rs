@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use tracing::{debug, warn};
@@ -48,7 +49,11 @@ impl SignatureData {
     fn placeholder() -> Self {
         Self::new(
             "signature-placeholder".to_string(),
-            vec!["(request-target)".to_string(), "host".to_string(), "date".to_string()],
+            vec![
+                "(request-target)".to_string(),
+                "host".to_string(),
+                "date".to_string(),
+            ],
             "rsa-sha256".to_string(),
         )
     }
@@ -62,13 +67,13 @@ impl SignatureService {
     // Functional signature verification with pattern matching
     pub fn verify_signature(
         &self,
-        headers: &HashMap<String, String>,
+        _headers: &HashMap<String, String>,
         signature: &str,
     ) -> Result<SignatureVerification> {
         debug!("Verifying signature: {}", signature);
 
         match self.parse_signature_header(signature) {
-            Ok(sig_data) => {
+            Ok(_sig_data) => {
                 // TODO: Implement actual verification logic
                 warn!("Signature verification not fully implemented - accepting all signatures");
                 Ok(SignatureVerification::Valid)
@@ -105,7 +110,7 @@ impl SignatureService {
         &self,
         method: &str,
         url: &str,
-        headers: &HashMap<String, String>,
+        _headers: &HashMap<String, String>,
     ) -> Result<SignatureData> {
         debug!("Signing {} request to {}", method, url);
 
@@ -130,7 +135,7 @@ impl SignatureService {
         headers: &HashMap<String, String>,
     ) -> Result<String> {
         let signature_data = self.sign_request(method, path, headers)?;
-        
+
         Ok(format!(
             r#"keyId="placeholder",algorithm="{}",headers="{}",signature="{}""#,
             signature_data.algorithm,
@@ -149,11 +154,11 @@ impl SignatureService {
         let mut headers = HashMap::new();
         headers.insert("host".to_string(), host.to_string());
         headers.insert("date".to_string(), date.to_string());
-        
+
         if let Some(digest_value) = digest {
             headers.insert("digest".to_string(), digest_value.to_string());
         }
-        
+
         headers
     }
 
@@ -174,29 +179,19 @@ pub fn create_signature_service_with_key(private_key: String) -> SignatureServic
 
 // Utility functions for common signature operations
 pub fn extract_key_id(signature: &str) -> Option<String> {
-    signature
-        .split(',')
-        .find_map(|part| {
-            let part = part.trim();
-            if part.starts_with("keyId=") {
-                Some(part[6..].trim_matches('"').to_string())
-            } else {
-                None
-            }
-        })
+    signature.split(',').find_map(|part| {
+        let part = part.trim();
+        part.strip_prefix("keyId=")
+            .map(|stripped| stripped.trim_matches('"').to_string())
+    })
 }
 
 pub fn extract_algorithm(signature: &str) -> Option<String> {
-    signature
-        .split(',')
-        .find_map(|part| {
-            let part = part.trim();
-            if part.starts_with("algorithm=") {
-                Some(part[10..].trim_matches('"').to_string())
-            } else {
-                None
-            }
-        })
+    signature.split(',').find_map(|part| {
+        let part = part.trim();
+        part.strip_prefix("algorithm=")
+            .map(|stripped| stripped.trim_matches('"').to_string())
+    })
 }
 
 #[cfg(test)]
@@ -210,7 +205,10 @@ mod tests {
     fn test_headers() -> HashMap<String, String> {
         let mut headers = HashMap::new();
         headers.insert("host".to_string(), "example.com".to_string());
-        headers.insert("date".to_string(), "Mon, 01 Jan 2024 12:00:00 GMT".to_string());
+        headers.insert(
+            "date".to_string(),
+            "Mon, 01 Jan 2024 12:00:00 GMT".to_string(),
+        );
         headers.insert("digest".to_string(), "SHA-256=hash".to_string());
         headers
     }
@@ -240,19 +238,25 @@ mod tests {
         let signature = test_signature();
 
         let parsed = service.parse_signature_header(&signature).unwrap();
-        
-        assert_eq!(parsed.get("keyId"), Some(&"https://example.com/users/alice#main-key".to_string()));
+
+        assert_eq!(
+            parsed.get("keyId"),
+            Some(&"https://example.com/users/alice#main-key".to_string())
+        );
         assert_eq!(parsed.get("algorithm"), Some(&"rsa-sha256".to_string()));
     }
 
     #[test]
     fn test_functional_utilities() {
         let signature = test_signature();
-        
+
         let key_id = extract_key_id(&signature);
         let algorithm = extract_algorithm(&signature);
 
-        assert_eq!(key_id, Some("https://example.com/users/alice#main-key".to_string()));
+        assert_eq!(
+            key_id,
+            Some("https://example.com/users/alice#main-key".to_string())
+        );
         assert_eq!(algorithm, Some("rsa-sha256".to_string()));
     }
 
@@ -271,8 +275,10 @@ mod tests {
         let service = SignatureService::new(Some("test-key".to_string()));
         let headers = test_headers();
 
-        let signature = service.create_http_signature("POST", "/inbox", &headers).unwrap();
-        
+        let signature = service
+            .create_http_signature("POST", "/inbox", &headers)
+            .unwrap();
+
         assert!(signature.contains("keyId="));
         assert!(signature.contains("algorithm="));
         assert!(signature.contains("signature="));
