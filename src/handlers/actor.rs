@@ -1,22 +1,43 @@
 use crate::config::Config;
+use crate::database::DatabaseRef;
 use crate::models::Actor;
 use actix_web::{get, web, HttpResponse, Result};
+use tracing::warn;
 
 #[get("/users/{username}")]
-pub async fn get_actor(path: web::Path<String>, config: web::Data<Config>) -> Result<HttpResponse> {
+pub async fn get_actor(
+    path: web::Path<String>,
+    config: web::Data<Config>,
+    db: web::Data<DatabaseRef>,
+) -> Result<HttpResponse> {
     let username = path.into_inner();
 
-    // For now, we'll create a simple actor with a placeholder public key
-    // In a real implementation, you'd load this from a database
-    let actor = Actor::new(
-        format!("{}/users/{}", config.server_url, username),
-        username.clone(),
-        username,
-        &config.server_url,
-        "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----".to_string(),
-    );
+    // Load actor from database
+    match db.get_actor_by_username(&username).await {
+        Ok(Some(db_actor)) => {
+            let actor = Actor::new(
+                db_actor.id.clone(),
+                db_actor.name,
+                db_actor.username,
+                &config.server_url,
+                db_actor.public_key_pem,
+            );
 
-    Ok(HttpResponse::Ok()
-        .content_type("application/activity+json")
-        .json(actor))
+            Ok(HttpResponse::Ok()
+                .content_type("application/activity+json")
+                .json(actor))
+        }
+        Ok(None) => {
+            warn!("Actor not found: {}", username);
+            Ok(HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Actor not found"
+            })))
+        }
+        Err(e) => {
+            warn!("Database error while fetching actor {}: {}", username, e);
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error"
+            })))
+        }
+    }
 }
