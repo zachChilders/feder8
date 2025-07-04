@@ -29,7 +29,10 @@ pub async fn inbox(
             })));
         }
         Err(e) => {
-            warn!("Database error while fetching target actor {}: {}", username, e);
+            warn!(
+                "Database error while fetching target actor {}: {}",
+                username, e
+            );
             return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Internal server error"
             })));
@@ -46,18 +49,42 @@ pub async fn inbox(
                     if let Some(object_type) = object.get("type").and_then(|v| v.as_str()) {
                         if object_type == "Note" {
                             info!("Received Note: {:?}", object);
-                            
+
                             // Extract note data
-                            let note_id = object.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let attributed_to = object.get("attributedTo").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let content = object.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let to_recipients = object.get("to").and_then(|v| v.as_array())
-                                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                            let note_id = object
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let attributed_to = object
+                                .get("attributedTo")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let content = object
+                                .get("content")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let to_recipients = object
+                                .get("to")
+                                .and_then(|v| v.as_array())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                        .collect()
+                                })
                                 .unwrap_or_else(Vec::new);
-                            let cc_recipients = object.get("cc").and_then(|v| v.as_array())
-                                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                            let cc_recipients = object
+                                .get("cc")
+                                .and_then(|v| v.as_array())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                        .collect()
+                                })
                                 .unwrap_or_else(Vec::new);
-                            
+
                             // Create the note in database if it doesn't exist
                             if let Ok(None) = db.get_note_by_id(&note_id).await {
                                 let db_note = crate::database::DbNote {
@@ -66,31 +93,54 @@ pub async fn inbox(
                                     content,
                                     to_recipients: to_recipients.clone(),
                                     cc_recipients: cc_recipients.clone(),
-                                    published: object.get("published")
+                                    published: object
+                                        .get("published")
                                         .and_then(|v| v.as_str())
                                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                                         .map(|dt| dt.with_timezone(&chrono::Utc))
                                         .unwrap_or_else(chrono::Utc::now),
-                                    in_reply_to: object.get("inReplyTo").and_then(|v| v.as_str().map(|s| s.to_string())),
+                                    in_reply_to: object
+                                        .get("inReplyTo")
+                                        .and_then(|v| v.as_str().map(|s| s.to_string())),
                                     tags: vec![], // TODO: Extract tags from object
                                     created_at: chrono::Utc::now(),
                                 };
-                                
+
                                 if let Err(e) = db.create_note(&db_note).await {
                                     warn!("Database error while creating note from inbox: {}", e);
                                 }
                             }
-                            
+
                             // Store the activity
-                            let activity_id = activity.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let actor_id = activity.get("actor").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let activity_to = activity.get("to").and_then(|v| v.as_array())
-                                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                            let activity_id = activity
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let actor_id = activity
+                                .get("actor")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let activity_to = activity
+                                .get("to")
+                                .and_then(|v| v.as_array())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                        .collect()
+                                })
                                 .unwrap_or_else(Vec::new);
-                            let activity_cc = activity.get("cc").and_then(|v| v.as_array())
-                                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                            let activity_cc = activity
+                                .get("cc")
+                                .and_then(|v| v.as_array())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                        .collect()
+                                })
                                 .unwrap_or_else(Vec::new);
-                            
+
                             let db_activity = crate::database::DbActivity {
                                 id: activity_id,
                                 actor_id,
@@ -98,14 +148,15 @@ pub async fn inbox(
                                 object: object.clone(),
                                 to_recipients: activity_to,
                                 cc_recipients: activity_cc,
-                                published: activity.get("published")
+                                published: activity
+                                    .get("published")
                                     .and_then(|v| v.as_str())
                                     .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                                     .map(|dt| dt.with_timezone(&chrono::Utc))
                                     .unwrap_or_else(chrono::Utc::now),
                                 created_at: chrono::Utc::now(),
                             };
-                            
+
                             if let Err(e) = db.create_activity(&db_activity).await {
                                 warn!("Database error while creating activity from inbox: {}", e);
                             }
@@ -116,13 +167,26 @@ pub async fn inbox(
             "Follow" => {
                 info!("Processing Follow activity");
                 // Handle Follow activity
-                let _activity_id = activity.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let follower_id = activity.get("actor").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let following_id = activity.get("object").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                
+                let _activity_id = activity
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let follower_id = activity
+                    .get("actor")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let following_id = activity
+                    .get("object")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
                 // Check if this is targeting our actor
                 if following_id == target_actor.id {
-                    let follow_id = format!("{}/follows/{}", config.server_url, uuid::Uuid::new_v4());
+                    let follow_id =
+                        format!("{}/follows/{}", config.server_url, uuid::Uuid::new_v4());
                     let db_follow = crate::database::DbFollowRelation {
                         id: follow_id,
                         follower_id,
@@ -131,7 +195,7 @@ pub async fn inbox(
                         created_at: chrono::Utc::now(),
                         updated_at: chrono::Utc::now(),
                     };
-                    
+
                     if let Err(e) = db.create_follow(&db_follow).await {
                         warn!("Database error while creating follow relationship: {}", e);
                     } else {
@@ -160,13 +224,18 @@ pub async fn inbox(
                     if let Some(object_type) = object.get("type").and_then(|v| v.as_str()) {
                         if object_type == "Follow" {
                             // Undo follow - delete the follow relationship
-                            let follower_id = activity.get("actor").and_then(|v| v.as_str()).unwrap_or("");
-                            let following_id = object.get("object").and_then(|v| v.as_str()).unwrap_or("");
-                            
+                            let follower_id =
+                                activity.get("actor").and_then(|v| v.as_str()).unwrap_or("");
+                            let following_id =
+                                object.get("object").and_then(|v| v.as_str()).unwrap_or("");
+
                             if following_id == target_actor.id {
                                 // Find and delete the follow relationship
                                 // This is a simplified approach - in practice you'd query for the specific follow
-                                info!("Processing unfollow from {} to {}", follower_id, following_id);
+                                info!(
+                                    "Processing unfollow from {} to {}",
+                                    follower_id, following_id
+                                );
                             }
                         }
                     }

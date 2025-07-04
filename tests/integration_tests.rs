@@ -1,5 +1,10 @@
 use actix_web::{http::StatusCode, test, web, App};
-use feder8::{config::Config, database::{create_configured_mock_database, DatabaseRef}, handlers, models::Actor};
+use feder8::{
+    config::Config,
+    database::{create_configured_mock_database, DatabaseRef},
+    handlers,
+    models::Actor,
+};
 use serde_json::{json, Value};
 use std::sync::Arc;
 
@@ -157,31 +162,27 @@ async fn test_get_actor_different_username() {
 async fn test_inbox_create_activity() {
     let config = create_test_config();
     let mut mock = feder8::database::MockDatabase::new();
-    
+
     // Set up expectations for inbox processing
-    mock.expect_get_actor_by_username()
-        .returning(|username| {
-            Ok(Some(feder8::database::DbActor {
-                id: format!("https://test.example.com/users/{}", username),
-                username: username.to_string(),
-                name: format!("Test User {}", username),
-                summary: Some("A test user".to_string()),
-                public_key_pem: "test_key".to_string(),
-                private_key_pem: None,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            }))
-        });
-    
-    mock.expect_get_note_by_id()
-        .returning(|_| Ok(None)); // Note doesn't exist yet
-        
-    mock.expect_create_note()
-        .returning(|_| Ok(()));
-        
-    mock.expect_create_activity()
-        .returning(|_| Ok(()));
-    
+    mock.expect_get_actor_by_username().returning(|username| {
+        Ok(Some(feder8::database::DbActor {
+            id: format!("https://test.example.com/users/{}", username),
+            username: username.to_string(),
+            name: format!("Test User {}", username),
+            summary: Some("A test user".to_string()),
+            public_key_pem: "test_key".to_string(),
+            private_key_pem: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }))
+    });
+
+    mock.expect_get_note_by_id().returning(|_| Ok(None)); // Note doesn't exist yet
+
+    mock.expect_create_note().returning(|_| Ok(()));
+
+    mock.expect_create_activity().returning(|_| Ok(()));
+
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(
         App::new()
@@ -310,28 +311,25 @@ async fn test_get_outbox() {
 async fn test_post_outbox_create_activity() {
     let config = create_test_config();
     let mut mock = feder8::database::MockDatabase::new();
-    
+
     // Set up expectations for outbox processing
-    mock.expect_get_actor_by_username()
-        .returning(|username| {
-            Ok(Some(feder8::database::DbActor {
-                id: format!("https://test.example.com/users/{}", username),
-                username: username.to_string(),
-                name: format!("Test User {}", username),
-                summary: Some("A test user".to_string()),
-                public_key_pem: "test_key".to_string(),
-                private_key_pem: None,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            }))
-        });
-        
-    mock.expect_create_note()
-        .returning(|_| Ok(()));
-        
-    mock.expect_create_activity()
-        .returning(|_| Ok(()));
-    
+    mock.expect_get_actor_by_username().returning(|username| {
+        Ok(Some(feder8::database::DbActor {
+            id: format!("https://test.example.com/users/{}", username),
+            username: username.to_string(),
+            name: format!("Test User {}", username),
+            summary: Some("A test user".to_string()),
+            public_key_pem: "test_key".to_string(),
+            private_key_pem: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }))
+    });
+
+    mock.expect_create_note().returning(|_| Ok(()));
+
+    mock.expect_create_activity().returning(|_| Ok(()));
+
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(
         App::new()

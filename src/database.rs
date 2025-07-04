@@ -59,7 +59,8 @@ pub trait Database: Send + Sync {
     // Actor operations
     async fn create_actor(&self, actor: &DbActor) -> Result<(), DatabaseError>;
     async fn get_actor_by_id(&self, id: &str) -> Result<Option<DbActor>, DatabaseError>;
-    async fn get_actor_by_username(&self, username: &str) -> Result<Option<DbActor>, DatabaseError>;
+    async fn get_actor_by_username(&self, username: &str)
+        -> Result<Option<DbActor>, DatabaseError>;
     async fn update_actor(&self, actor: &DbActor) -> Result<(), DatabaseError>;
     async fn delete_actor(&self, id: &str) -> Result<(), DatabaseError>;
 
@@ -225,7 +226,10 @@ impl Database for SqliteDatabase {
         }))
     }
 
-    async fn get_actor_by_username(&self, username: &str) -> Result<Option<DbActor>, DatabaseError> {
+    async fn get_actor_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<DbActor>, DatabaseError> {
         let row = sqlx::query!(
             "SELECT id, username, name, summary, public_key_pem, private_key_pem, created_at, updated_at FROM actors WHERE username = ?",
             username
@@ -303,18 +307,20 @@ impl Database for SqliteDatabase {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| -> Result<DbActivity, DatabaseError> {
-            Ok(DbActivity {
-                id: r.id.unwrap_or_default(),
-                actor_id: r.actor_id,
-                activity_type: r.activity_type,
-                object: serde_json::from_str(&r.object)?,
-                to_recipients: serde_json::from_str(&r.to_recipients)?,
-                cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                published: Self::naive_to_utc(r.published),
-                created_at: Self::naive_to_utc(r.created_at),
+        Ok(row
+            .map(|r| -> Result<DbActivity, DatabaseError> {
+                Ok(DbActivity {
+                    id: r.id.unwrap_or_default(),
+                    actor_id: r.actor_id,
+                    activity_type: r.activity_type,
+                    object: serde_json::from_str(&r.object)?,
+                    to_recipients: serde_json::from_str(&r.to_recipients)?,
+                    cc_recipients: serde_json::from_str(&r.cc_recipients)?,
+                    published: Self::naive_to_utc(r.published),
+                    created_at: Self::naive_to_utc(r.created_at),
+                })
             })
-        }).transpose()?)
+            .transpose()?)
     }
 
     async fn get_activities_by_actor(
@@ -419,19 +425,21 @@ impl Database for SqliteDatabase {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| -> Result<DbNote, DatabaseError> {
-            Ok(DbNote {
-                id: r.id.unwrap_or_default(),
-                attributed_to: r.attributed_to,
-                content: r.content,
-                to_recipients: serde_json::from_str(&r.to_recipients)?,
-                cc_recipients: serde_json::from_str(&r.cc_recipients)?,
-                published: Self::naive_to_utc(r.published),
-                in_reply_to: r.in_reply_to,
-                tags: serde_json::from_str(&r.tags)?,
-                created_at: Self::naive_to_utc(r.created_at),
+        Ok(row
+            .map(|r| -> Result<DbNote, DatabaseError> {
+                Ok(DbNote {
+                    id: r.id.unwrap_or_default(),
+                    attributed_to: r.attributed_to,
+                    content: r.content,
+                    to_recipients: serde_json::from_str(&r.to_recipients)?,
+                    cc_recipients: serde_json::from_str(&r.cc_recipients)?,
+                    published: Self::naive_to_utc(r.published),
+                    in_reply_to: r.in_reply_to,
+                    tags: serde_json::from_str(&r.tags)?,
+                    created_at: Self::naive_to_utc(r.created_at),
+                })
             })
-        }).transpose()?)
+            .transpose()?)
     }
 
     async fn get_notes_by_actor(
@@ -524,14 +532,17 @@ impl Database for SqliteDatabase {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| DbFollowRelation {
-            id: r.id.unwrap_or_default(),
-            follower_id: r.follower_id,
-            following_id: r.following_id,
-            status: r.status,
-            created_at: Self::naive_to_utc(r.created_at),
-            updated_at: Self::naive_to_utc(r.updated_at),
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| DbFollowRelation {
+                id: r.id.unwrap_or_default(),
+                follower_id: r.follower_id,
+                following_id: r.following_id,
+                status: r.status,
+                created_at: Self::naive_to_utc(r.created_at),
+                updated_at: Self::naive_to_utc(r.updated_at),
+            })
+            .collect())
     }
 
     async fn get_following(
@@ -549,14 +560,17 @@ impl Database for SqliteDatabase {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| DbFollowRelation {
-            id: r.id.unwrap_or_default(),
-            follower_id: r.follower_id,
-            following_id: r.following_id,
-            status: r.status,
-            created_at: Self::naive_to_utc(r.created_at),
-            updated_at: Self::naive_to_utc(r.updated_at),
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| DbFollowRelation {
+                id: r.id.unwrap_or_default(),
+                follower_id: r.follower_id,
+                following_id: r.following_id,
+                status: r.status,
+                created_at: Self::naive_to_utc(r.created_at),
+                updated_at: Self::naive_to_utc(r.updated_at),
+            })
+            .collect())
     }
 
     async fn update_follow_status(
@@ -649,14 +663,12 @@ pub fn create_configured_mock_database() -> MockDatabase {
             }))
         });
 
-    mock.expect_get_actor_outbox_count()
-        .returning(|_| Ok(5));
+    mock.expect_get_actor_outbox_count().returning(|_| Ok(5));
 
     mock.expect_get_activities_by_actor()
         .returning(|_, _, _| Ok(vec![]));
 
-    mock.expect_get_actor_inbox_count()
-        .returning(|_| Ok(3));
+    mock.expect_get_actor_inbox_count().returning(|_| Ok(3));
 
     mock.expect_get_inbox_activities()
         .returning(|_, _, _| Ok(vec![]));

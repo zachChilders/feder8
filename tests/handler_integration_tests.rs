@@ -1,7 +1,7 @@
 use actix_web::{test, web, App, HttpResponse};
 use chrono::Utc;
 use feder8::config::Config;
-use feder8::database::{DatabaseRef, DbActor, DbActivity, DbNote, MockDatabase};
+use feder8::database::{DatabaseRef, DbActivity, DbActor, DbNote, MockDatabase};
 use feder8::handlers;
 use mockall::predicate::*;
 use serde_json::json;
@@ -9,7 +9,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 // Helper function to create a test app with mock database
-fn create_test_app(db: DatabaseRef) -> App<
+fn create_test_app(
+    db: DatabaseRef,
+) -> App<
     impl actix_web::dev::ServiceFactory<
         actix_web::dev::ServiceRequest,
         Config = (),
@@ -96,7 +98,11 @@ async fn test_get_actor_handler_database_error() {
 
     mock.expect_get_actor_by_username()
         .with(eq("error_user"))
-        .returning(|_| Err(feder8::database::DatabaseError::Query("Database error".to_string())));
+        .returning(|_| {
+            Err(feder8::database::DatabaseError::Query(
+                "Database error".to_string(),
+            ))
+        });
 
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(create_test_app(db)).await;
@@ -145,18 +151,16 @@ async fn test_get_outbox_handler_success() {
     mock.expect_get_activities_by_actor()
         .with(eq(actor_id.clone()), eq(20), eq(0))
         .returning(move |_, _, _| {
-            Ok(vec![
-                DbActivity {
-                    id: activity_id_clone.clone(),
-                    actor_id: actor_id_clone2.clone(),
-                    activity_type: "Create".to_string(),
-                    object: json!({"type": "Note", "content": "Hello, world!"}),
-                    to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
-                    cc_recipients: vec![],
-                    published: Utc::now(),
-                    created_at: Utc::now(),
-                },
-            ])
+            Ok(vec![DbActivity {
+                id: activity_id_clone.clone(),
+                actor_id: actor_id_clone2.clone(),
+                activity_type: "Create".to_string(),
+                object: json!({"type": "Note", "content": "Hello, world!"}),
+                to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
+                cc_recipients: vec![],
+                published: Utc::now(),
+                created_at: Utc::now(),
+            }])
         });
 
     let db: DatabaseRef = Arc::new(mock);
@@ -221,11 +225,9 @@ async fn test_post_outbox_handler_create_note() {
             }))
         });
 
-    mock.expect_create_note()
-        .returning(|_| Ok(()));
+    mock.expect_create_note().returning(|_| Ok(()));
 
-    mock.expect_create_activity()
-        .returning(|_| Ok(()));
+    mock.expect_create_activity().returning(|_| Ok(()));
 
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(create_test_app(db)).await;
@@ -254,7 +256,10 @@ async fn test_post_outbox_handler_create_note() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["type"], "Create");
     assert_eq!(body["actor"], "https://example.com/users/testuser");
-    assert!(body["id"].as_str().unwrap().starts_with("https://example.com/activities/"));
+    assert!(body["id"]
+        .as_str()
+        .unwrap()
+        .starts_with("https://example.com/activities/"));
 }
 
 #[tokio::test]
@@ -310,14 +315,11 @@ async fn test_inbox_handler_create_note() {
             }))
         });
 
-    mock.expect_get_note_by_id()
-        .returning(|_| Ok(None)); // Note doesn't exist yet
+    mock.expect_get_note_by_id().returning(|_| Ok(None)); // Note doesn't exist yet
 
-    mock.expect_create_note()
-        .returning(|_| Ok(()));
+    mock.expect_create_note().returning(|_| Ok(()));
 
-    mock.expect_create_activity()
-        .returning(|_| Ok(()));
+    mock.expect_create_activity().returning(|_| Ok(()));
 
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(create_test_app(db)).await;
@@ -369,8 +371,7 @@ async fn test_inbox_handler_follow_activity() {
             }))
         });
 
-    mock.expect_create_follow()
-        .returning(|_| Ok(()));
+    mock.expect_create_follow().returning(|_| Ok(()));
 
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(create_test_app(db)).await;
@@ -414,7 +415,10 @@ async fn test_inbox_handler_accept_activity() {
         });
 
     mock.expect_update_follow_status()
-        .with(eq("https://remote.example/activities/follow/1"), eq("accepted"))
+        .with(
+            eq("https://remote.example/activities/follow/1"),
+            eq("accepted"),
+        )
         .returning(|_, _| Ok(()));
 
     let db: DatabaseRef = Arc::new(mock);
@@ -513,31 +517,26 @@ async fn test_complete_activity_flow() {
             }))
         });
 
-    mock.expect_create_note()
-        .returning(|_| Ok(()));
+    mock.expect_create_note().returning(|_| Ok(()));
 
-    mock.expect_create_activity()
-        .returning(|_| Ok(()));
+    mock.expect_create_activity().returning(|_| Ok(()));
 
-    mock.expect_create_follow()
-        .returning(|_| Ok(()));
+    mock.expect_create_follow().returning(|_| Ok(()));
 
-    mock.expect_get_actor_outbox_count()
-        .returning(|_| Ok(1));
+    mock.expect_get_actor_outbox_count().returning(|_| Ok(1));
 
-    mock.expect_get_activities_by_actor()
-        .returning(|_, _, _| {
-            Ok(vec![DbActivity {
-                id: "https://example.com/activities/1".to_string(),
-                actor_id: "https://example.com/users/alice".to_string(),
-                activity_type: "Create".to_string(),
-                object: json!({"type": "Note", "content": "Hello, world!"}),
-                to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
-                cc_recipients: vec![],
-                published: Utc::now(),
-                created_at: Utc::now(),
-            }])
-        });
+    mock.expect_get_activities_by_actor().returning(|_, _, _| {
+        Ok(vec![DbActivity {
+            id: "https://example.com/activities/1".to_string(),
+            actor_id: "https://example.com/users/alice".to_string(),
+            activity_type: "Create".to_string(),
+            object: json!({"type": "Note", "content": "Hello, world!"}),
+            to_recipients: vec!["https://www.w3.org/ns/activitystreams#Public".to_string()],
+            cc_recipients: vec![],
+            published: Utc::now(),
+            created_at: Utc::now(),
+        }])
+    });
 
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(create_test_app(db)).await;
@@ -601,7 +600,11 @@ async fn test_error_handling_in_handlers() {
     // Test database error in get_actor
     mock.expect_get_actor_by_username()
         .with(eq("error_actor"))
-        .returning(|_| Err(feder8::database::DatabaseError::Query("Connection failed".to_string())));
+        .returning(|_| {
+            Err(feder8::database::DatabaseError::Query(
+                "Connection failed".to_string(),
+            ))
+        });
 
     // Test database error in create_note
     mock.expect_get_actor_by_username()
@@ -619,8 +622,11 @@ async fn test_error_handling_in_handlers() {
             }))
         });
 
-    mock.expect_create_note()
-        .returning(|_| Err(feder8::database::DatabaseError::Query("Insert failed".to_string())));
+    mock.expect_create_note().returning(|_| {
+        Err(feder8::database::DatabaseError::Query(
+            "Insert failed".to_string(),
+        ))
+    });
 
     let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(create_test_app(db)).await;

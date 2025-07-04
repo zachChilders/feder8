@@ -14,6 +14,8 @@ jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:feder8.db
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,8 +25,21 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --features sqlite
+
+      - name: Setup database
+        run: |
+          sqlx database create
+          sqlx migrate run
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -36,6 +51,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:feder8.db
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,8 +60,21 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --features sqlite
+
+      - name: Setup database
+        run: |
+          sqlx database create
+          sqlx migrate run
 
       - name: Build
         run: cargo build --verbose
@@ -56,6 +86,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:feder8.db
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,8 +95,21 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --features sqlite
+
+      - name: Setup database
+        run: |
+          sqlx database create
+          sqlx migrate run
 
       - name: Run tests
         run: cargo test --verbose

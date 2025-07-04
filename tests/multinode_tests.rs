@@ -1,23 +1,22 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use feder8::{config::Config, handlers};
+use rand::Rng;
 use reqwest::Client;
 use serde_json::json;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::Once;
 use std::time::Duration;
-use tokio::time::sleep;
-use std::sync::Mutex;
-use std::sync::Arc;
 use tokio::task::JoinHandle;
-use rand::Rng;
+use tokio::time::sleep;
 
 static NODE_COUNT: usize = 7;
 
 mod test_harness {
     use super::*;
-    
+
     static INIT: Once = Once::new();
     static NODES: Mutex<Option<Arc<Mutex<Vec<JoinHandle<()>>>>>> = Mutex::new(None);
-
 
     pub struct TestContext {
         pub client: Client,
@@ -31,9 +30,7 @@ mod test_harness {
             let node_urls = (0..node_count)
                 .map(|i| format!("http://localhost:{}", base_port + i as u16))
                 .collect();
-            let actor_names = (0..node_count)
-                .map(|i| format!("actor{}", i + 1))
-                .collect();
+            let actor_names = (0..node_count).map(|i| format!("actor{}", i + 1)).collect();
             Self {
                 client: Client::new(),
                 node_urls,
@@ -65,7 +62,13 @@ mod test_harness {
         }
 
         async fn is_node_ready(&self, url: &str) -> bool {
-            match self.client.get(url).timeout(Duration::from_secs(1)).send().await {
+            match self
+                .client
+                .get(url)
+                .timeout(Duration::from_secs(1))
+                .send()
+                .await
+            {
                 Ok(_) => true,
                 Err(_) => false,
             }
@@ -131,22 +134,28 @@ mod test_harness {
     }
 }
 
-use test_harness::{TestContext, setup_nodes, teardown_nodes};
+use test_harness::{setup_nodes, teardown_nodes, TestContext};
 
 #[tokio::test]
 async fn test_node_setup_and_teardown() {
     let node_count = NODE_COUNT;
     let base_port = rand::thread_rng().gen_range(20000..60000);
     setup_nodes(node_count, base_port).await;
-    
+
     let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
-    
+
     // Verify both nodes are running
     for url in &context.node_urls {
-        assert!(context.client.get(url).timeout(Duration::from_secs(1)).send().await.is_ok());
+        assert!(context
+            .client
+            .get(url)
+            .timeout(Duration::from_secs(1))
+            .send()
+            .await
+            .is_ok());
     }
-    
+
     teardown_nodes();
 }
 
@@ -155,28 +164,39 @@ async fn test_alice_actor_profile() {
     let node_count = NODE_COUNT;
     let base_port = rand::thread_rng().gen_range(20000..60000);
     setup_nodes(node_count, base_port).await;
-    
+
     let context = TestContext::new(node_count, base_port);
     context.wait_for_nodes().await;
 
     let response = context
         .client
-        .get(&format!("{}/users/{}", context.node_urls[0], context.actor_names[0]))
+        .get(&format!(
+            "{}/users/{}",
+            context.node_urls[0], context.actor_names[0]
+        ))
         .header("Accept", "application/activity+json")
         .send()
         .await
         .expect("Failed to get actor profile");
 
     assert!(response.status().is_success());
-    
+
     let actor_data: serde_json::Value = response.json().await.expect("Failed to parse actor JSON");
-     
+
     // Check both camelCase and snake_case for backward compatibility
-    let username_field = actor_data.get("preferredUsername").or_else(|| actor_data.get("preferred_username"));
-    assert_eq!(username_field, Some(&serde_json::Value::String(context.actor_names[0].clone())));
+    let username_field = actor_data
+        .get("preferredUsername")
+        .or_else(|| actor_data.get("preferred_username"));
+    assert_eq!(
+        username_field,
+        Some(&serde_json::Value::String(context.actor_names[0].clone()))
+    );
     assert_eq!(actor_data["type"], "Person");
-    assert!(actor_data["inbox"].as_str().unwrap().contains(&format!("/users/{}", context.actor_names[0])));
-    
+    assert!(actor_data["inbox"]
+        .as_str()
+        .unwrap()
+        .contains(&format!("/users/{}", context.actor_names[0])));
+
     teardown_nodes();
 }
 
@@ -189,17 +209,28 @@ async fn test_bob_actor_profile() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!("{}/users/{}", context.node_urls[1], context.actor_names[1]))
+        .get(&format!(
+            "{}/users/{}",
+            context.node_urls[1], context.actor_names[1]
+        ))
         .header("Accept", "application/activity+json")
         .send()
         .await
         .expect("Failed to get actor profile");
     assert!(response.status().is_success());
     let actor_data: serde_json::Value = response.json().await.expect("Failed to parse actor JSON");
-    let username_field = actor_data.get("preferredUsername").or_else(|| actor_data.get("preferred_username"));
-    assert_eq!(username_field, Some(&serde_json::Value::String(context.actor_names[1].clone())));
+    let username_field = actor_data
+        .get("preferredUsername")
+        .or_else(|| actor_data.get("preferred_username"));
+    assert_eq!(
+        username_field,
+        Some(&serde_json::Value::String(context.actor_names[1].clone()))
+    );
     assert_eq!(actor_data["type"], "Person");
-    assert!(actor_data["inbox"].as_str().unwrap().contains(&format!("/users/{}", context.actor_names[1])));
+    assert!(actor_data["inbox"]
+        .as_str()
+        .unwrap()
+        .contains(&format!("/users/{}", context.actor_names[1])));
     teardown_nodes();
 }
 
@@ -212,17 +243,33 @@ async fn test_webfinger_discovery() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!("{}/.well-known/webfinger?resource=acct:{}@localhost:{}", context.node_urls[0], context.actor_names[0], context.base_port))
+        .get(&format!(
+            "{}/.well-known/webfinger?resource=acct:{}@localhost:{}",
+            context.node_urls[0], context.actor_names[0], context.base_port
+        ))
         .header("Accept", "application/jrd+json")
         .send()
         .await
         .expect("Failed to get WebFinger response");
     assert!(response.status().is_success());
-    let webfinger_data: serde_json::Value = response.json().await.expect("Failed to parse WebFinger JSON");
-    assert_eq!(webfinger_data["subject"], format!("acct:{}@localhost:{}", context.actor_names[0], context.base_port));
-    let links = webfinger_data["links"].as_array().expect("Links should be an array");
+    let webfinger_data: serde_json::Value = response
+        .json()
+        .await
+        .expect("Failed to parse WebFinger JSON");
+    assert_eq!(
+        webfinger_data["subject"],
+        format!(
+            "acct:{}@localhost:{}",
+            context.actor_names[0], context.base_port
+        )
+    );
+    let links = webfinger_data["links"]
+        .as_array()
+        .expect("Links should be an array");
     assert!(!links.is_empty());
-    let activitypub_link = links.iter().find(|link| link["rel"] == "self" && link["type"] == "application/activity+json");
+    let activitypub_link = links
+        .iter()
+        .find(|link| link["rel"] == "self" && link["type"] == "application/activity+json");
     assert!(activitypub_link.is_some());
     teardown_nodes();
 }
@@ -256,7 +303,10 @@ async fn test_message_delivery_between_nodes() {
     });
     let response = context
         .client
-        .post(&format!("{}/users/{}/inbox", context.node_urls[1], context.actor_names[1]))
+        .post(&format!(
+            "{}/users/{}/inbox",
+            context.node_urls[1], context.actor_names[1]
+        ))
         .header("Content-Type", "application/activity+json")
         .json(&create_activity)
         .send()
@@ -275,16 +325,27 @@ async fn test_cross_node_actor_discovery() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!("{}/users/{}", context.node_urls[1], context.actor_names[1]))
+        .get(&format!(
+            "{}/users/{}",
+            context.node_urls[1], context.actor_names[1]
+        ))
         .header("Accept", "application/activity+json")
         .send()
         .await
         .expect("Failed to get actor profile");
     assert!(response.status().is_success());
     let actor_data: serde_json::Value = response.json().await.expect("Failed to parse actor JSON");
-    let username_field = actor_data.get("preferredUsername").or_else(|| actor_data.get("preferred_username"));
-    assert_eq!(username_field, Some(&serde_json::Value::String(context.actor_names[1].clone())));
-    assert_eq!(actor_data["id"], format!("{}/users/{}", context.node_urls[1], context.actor_names[1]));
+    let username_field = actor_data
+        .get("preferredUsername")
+        .or_else(|| actor_data.get("preferred_username"));
+    assert_eq!(
+        username_field,
+        Some(&serde_json::Value::String(context.actor_names[1].clone()))
+    );
+    assert_eq!(
+        actor_data["id"],
+        format!("{}/users/{}", context.node_urls[1], context.actor_names[1])
+    );
     teardown_nodes();
 }
 
@@ -312,7 +373,10 @@ async fn test_inbox_endpoint_accepts_activities() {
     });
     let response = context
         .client
-        .post(&format!("{}/users/{}/inbox", context.node_urls[1], context.actor_names[1]))
+        .post(&format!(
+            "{}/users/{}/inbox",
+            context.node_urls[1], context.actor_names[1]
+        ))
         .header("Content-Type", "application/activity+json")
         .json(&test_activity)
         .send()
@@ -331,14 +395,24 @@ async fn test_outbox_endpoint_returns_collection() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!("{}/users/{}/outbox", context.node_urls[0], context.actor_names[0]))
+        .get(&format!(
+            "{}/users/{}/outbox",
+            context.node_urls[0], context.actor_names[0]
+        ))
         .header("Accept", "application/activity+json")
         .send()
         .await
         .expect("Failed to get outbox");
     assert!(response.status().is_success());
-    let outbox_data: serde_json::Value = response.json().await.expect("Failed to parse outbox JSON");
+    let outbox_data: serde_json::Value =
+        response.json().await.expect("Failed to parse outbox JSON");
     assert_eq!(outbox_data["type"], "OrderedCollection");
-    assert_eq!(outbox_data["id"], format!("{}/users/{}/outbox", context.node_urls[0], context.actor_names[0]));
+    assert_eq!(
+        outbox_data["id"],
+        format!(
+            "{}/users/{}/outbox",
+            context.node_urls[0], context.actor_names[0]
+        )
+    );
     teardown_nodes();
-} 
+}
