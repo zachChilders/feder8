@@ -88,3 +88,229 @@ impl DeliveryService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn create_test_config() -> Config {
+        Config {
+            server_name: "Test Server".to_string(),
+            server_url: "https://test.example.com".to_string(),
+            port: 8080,
+            actor_name: "testuser".to_string(),
+            private_key_path: None,
+            public_key_path: None,
+        }
+    }
+
+    fn create_test_activity() -> Value {
+        json!({
+            "@context": ["https://www.w3.org/ns/activitystreams"],
+            "id": "https://test.example.com/activities/123",
+            "type": "Create",
+            "actor": "https://test.example.com/users/alice",
+            "object": {
+                "type": "Note",
+                "content": "Hello, world!",
+                "attributedTo": "https://test.example.com/users/alice"
+            },
+            "to": ["https://www.w3.org/ns/activitystreams#Public"],
+            "cc": ["https://test.example.com/users/alice/followers"]
+        })
+    }
+
+    #[test]
+    fn test_delivery_service_new() {
+        let config = create_test_config();
+        let service = DeliveryService::new(config.clone());
+        
+        assert_eq!(service.config.server_name, config.server_name);
+        assert_eq!(service.config.server_url, config.server_url);
+        assert_eq!(service.config.port, config.port);
+        assert_eq!(service.config.actor_name, config.actor_name);
+    }
+
+    #[test]
+    fn test_delivery_service_with_different_configs() {
+        let config1 = Config {
+            server_name: "Server 1".to_string(),
+            server_url: "https://server1.com".to_string(),
+            port: 8080,
+            actor_name: "alice".to_string(),
+            private_key_path: None,
+            public_key_path: None,
+        };
+        
+        let config2 = Config {
+            server_name: "Server 2".to_string(),
+            server_url: "https://server2.com".to_string(),
+            port: 9090,
+            actor_name: "bob".to_string(),
+            private_key_path: Some("/path/to/key".to_string()),
+            public_key_path: Some("/path/to/pub".to_string()),
+        };
+
+        let service1 = DeliveryService::new(config1.clone());
+        let service2 = DeliveryService::new(config2.clone());
+        
+        assert_eq!(service1.config.server_name, "Server 1");
+        assert_eq!(service1.config.actor_name, "alice");
+        assert_eq!(service2.config.server_name, "Server 2");
+        assert_eq!(service2.config.actor_name, "bob");
+        assert_eq!(service2.config.port, 9090);
+    }
+
+    // Note: The following tests would require actual HTTP mocking to test properly.
+    // In a real-world scenario, you'd use a library like mockito or similar to mock HTTP responses.
+    // For now, we're testing the service creation and structure.
+
+    #[tokio::test]
+    async fn test_deliver_to_followers_empty_list() {
+        let config = create_test_config();
+        let service = DeliveryService::new(config);
+        let activity = create_test_activity();
+        let followers = vec![];
+
+        // This should complete without error even with empty followers list
+        let result = service.deliver_to_followers(activity, followers).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_deliver_to_public_empty_list() {
+        let config = create_test_config();
+        let service = DeliveryService::new(config);
+        let activity = create_test_activity();
+        let public_inboxes = vec![];
+
+        // This should complete without error even with empty inboxes list
+        let result = service.deliver_to_public(activity, public_inboxes).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_activity_structure() {
+        let activity = create_test_activity();
+        
+        assert_eq!(activity["type"], "Create");
+        assert_eq!(activity["actor"], "https://test.example.com/users/alice");
+        assert_eq!(activity["object"]["type"], "Note");
+        assert_eq!(activity["object"]["content"], "Hello, world!");
+        assert!(activity["to"].as_array().unwrap().contains(&json!("https://www.w3.org/ns/activitystreams#Public")));
+    }
+
+    #[test]
+    fn test_complex_activity_creation() {
+        let complex_activity = json!({
+            "@context": [
+                "https://www.w3.org/ns/activitystreams",
+                "https://w3id.org/security/v1"
+            ],
+            "id": "https://mastodon.social/activities/123456",
+            "type": "Follow",
+            "actor": "https://mastodon.social/users/alice",
+            "object": "https://pleroma.instance/users/bob",
+            "to": ["https://pleroma.instance/users/bob"],
+            "cc": [],
+            "published": "2024-01-01T12:00:00Z",
+            "signature": {
+                "type": "RsaSignature2017",
+                "creator": "https://mastodon.social/users/alice#main-key",
+                "created": "2024-01-01T12:00:00Z",
+                "signatureValue": "signature..."
+            }
+        });
+
+        assert_eq!(complex_activity["type"], "Follow");
+        assert_eq!(complex_activity["actor"], "https://mastodon.social/users/alice");
+        assert_eq!(complex_activity["object"], "https://pleroma.instance/users/bob");
+        assert!(complex_activity["signature"]["type"] == "RsaSignature2017");
+    }
+
+    #[test]
+    fn test_multiple_followers_structure() {
+        let followers = vec![
+            "https://mastodon.social/users/alice/inbox".to_string(),
+            "https://pleroma.instance/users/bob/inbox".to_string(),
+            "https://misskey.io/users/charlie/inbox".to_string(),
+        ];
+
+        assert_eq!(followers.len(), 3);
+        assert!(followers.contains(&"https://mastodon.social/users/alice/inbox".to_string()));
+        assert!(followers.contains(&"https://pleroma.instance/users/bob/inbox".to_string()));
+        assert!(followers.contains(&"https://misskey.io/users/charlie/inbox".to_string()));
+    }
+
+    #[test]
+    fn test_public_inboxes_structure() {
+        let public_inboxes = vec![
+            "https://relay.fediverse.org/inbox".to_string(),
+            "https://relay.activitypub.org/inbox".to_string(),
+        ];
+
+        assert_eq!(public_inboxes.len(), 2);
+        assert!(public_inboxes.contains(&"https://relay.fediverse.org/inbox".to_string()));
+        assert!(public_inboxes.contains(&"https://relay.activitypub.org/inbox".to_string()));
+    }
+
+    #[test]
+    fn test_activity_cloning() {
+        let activity = create_test_activity();
+        let cloned_activity = activity.clone();
+        
+        assert_eq!(activity, cloned_activity);
+        assert_eq!(activity["id"], cloned_activity["id"]);
+        assert_eq!(activity["type"], cloned_activity["type"]);
+        assert_eq!(activity["actor"], cloned_activity["actor"]);
+    }
+
+    #[test]
+    fn test_delivery_service_config_persistence() {
+        let original_config = create_test_config();
+        let service = DeliveryService::new(original_config.clone());
+        
+        // Verify that the service maintains a copy of the config
+        assert_eq!(service.config.server_name, original_config.server_name);
+        assert_eq!(service.config.server_url, original_config.server_url);
+        assert_eq!(service.config.port, original_config.port);
+        assert_eq!(service.config.actor_name, original_config.actor_name);
+        assert_eq!(service.config.private_key_path, original_config.private_key_path);
+        assert_eq!(service.config.public_key_path, original_config.public_key_path);
+    }
+
+    // Test different activity types
+    #[test]
+    fn test_different_activity_types() {
+        let follow_activity = json!({
+            "type": "Follow",
+            "actor": "https://example.com/users/alice",
+            "object": "https://example.com/users/bob"
+        });
+
+        let accept_activity = json!({
+            "type": "Accept",
+            "actor": "https://example.com/users/bob",
+            "object": {
+                "type": "Follow",
+                "actor": "https://example.com/users/alice",
+                "object": "https://example.com/users/bob"
+            }
+        });
+
+        let undo_activity = json!({
+            "type": "Undo",
+            "actor": "https://example.com/users/alice",
+            "object": {
+                "type": "Follow",
+                "actor": "https://example.com/users/alice",
+                "object": "https://example.com/users/bob"
+            }
+        });
+
+        assert_eq!(follow_activity["type"], "Follow");
+        assert_eq!(accept_activity["type"], "Accept");
+        assert_eq!(undo_activity["type"], "Undo");
+    }
+}
