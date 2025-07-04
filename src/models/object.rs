@@ -161,7 +161,10 @@ mod tests {
             },
         ];
 
-        assert_eq!(note.in_reply_to, Some("https://example.com/notes/123".to_string()));
+        assert_eq!(
+            note.in_reply_to,
+            Some("https://example.com/notes/123".to_string())
+        );
         assert_eq!(note.tag.len(), 2);
         assert_eq!(note.tag[0].tag_type, "Mention");
         assert_eq!(note.tag[0].name, "@alice");
@@ -228,20 +231,20 @@ mod tests {
 
         let collection = Collection::new(id.clone(), total_items);
 
-        assert_eq!(collection.context, vec!["https://www.w3.org/ns/activitystreams"]);
+        assert_eq!(
+            collection.context,
+            vec!["https://www.w3.org/ns/activitystreams"]
+        );
         assert_eq!(collection.id, id);
         assert_eq!(collection.collection_type, "Collection");
         assert_eq!(collection.total_items, total_items);
-        assert_eq!(collection.first, format!("{}?page=true", id));
-        assert_eq!(collection.last, format!("{}?page=true", id));
+        assert_eq!(collection.first, format!("{id}?page=true"));
+        assert_eq!(collection.last, format!("{id}?page=true"));
     }
 
     #[test]
     fn test_collection_serialization() {
-        let collection = Collection::new(
-            "https://example.com/collections/test".to_string(),
-            10,
-        );
+        let collection = Collection::new("https://example.com/collections/test".to_string(), 10);
 
         let json = serde_json::to_string(&collection).unwrap();
         let deserialized: Collection = serde_json::from_str(&json).unwrap();
@@ -264,12 +267,15 @@ mod tests {
 
         let ordered_collection = OrderedCollection::new(id.clone(), total_items, items.clone());
 
-        assert_eq!(ordered_collection.context, vec!["https://www.w3.org/ns/activitystreams"]);
+        assert_eq!(
+            ordered_collection.context,
+            vec!["https://www.w3.org/ns/activitystreams"]
+        );
         assert_eq!(ordered_collection.id, id);
         assert_eq!(ordered_collection.collection_type, "OrderedCollection");
         assert_eq!(ordered_collection.total_items, total_items);
-        assert_eq!(ordered_collection.first, format!("{}?page=true", id));
-        assert_eq!(ordered_collection.last, format!("{}?page=true", id));
+        assert_eq!(ordered_collection.first, format!("{id}?page=true"));
+        assert_eq!(ordered_collection.last, format!("{id}?page=true"));
         assert_eq!(ordered_collection.ordered_items, items);
     }
 
@@ -288,17 +294,17 @@ mod tests {
             json!({"type": "Note", "content": "Hello"}),
             json!({"type": "Note", "content": "World"}),
         ];
-        let ordered_collection = OrderedCollection::new(
-            "https://example.com/test".to_string(),
-            2,
-            items.clone(),
-        );
+        let ordered_collection =
+            OrderedCollection::new("https://example.com/test".to_string(), 2, items.clone());
 
         let json = serde_json::to_string(&ordered_collection).unwrap();
         let deserialized: OrderedCollection = serde_json::from_str(&json).unwrap();
 
         assert_eq!(ordered_collection.id, deserialized.id);
-        assert_eq!(ordered_collection.collection_type, deserialized.collection_type);
+        assert_eq!(
+            ordered_collection.collection_type,
+            deserialized.collection_type
+        );
         assert_eq!(ordered_collection.total_items, deserialized.total_items);
         assert_eq!(ordered_collection.ordered_items, deserialized.ordered_items);
     }
@@ -358,7 +364,13 @@ mod tests {
         let base_id = "https://example.com/users/alice/outbox";
         let collection = Collection::new(base_id.to_string(), 100);
 
-        assert_eq!(collection.first, "https://example.com/users/alice/outbox?page=true");
-        assert_eq!(collection.last, "https://example.com/users/alice/outbox?page=true");
+        assert_eq!(
+            collection.first,
+            "https://example.com/users/alice/outbox?page=true"
+        );
+        assert_eq!(
+            collection.last,
+            "https://example.com/users/alice/outbox?page=true"
+        );
     }
 }

@@ -1,4 +1,4 @@
-use actix_web::{test, web, App, http::StatusCode};
+use actix_web::{http::StatusCode, test, web, App};
 use fediverse::{config::Config, handlers, models::Actor};
 use serde_json::{json, Value};
 
@@ -19,8 +19,9 @@ async fn test_webfinger_valid_request() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::webfinger::webfinger)
-    ).await;
+            .service(handlers::webfinger::webfinger),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/.well-known/webfinger?resource=acct:testuser@test.example.com")
@@ -32,15 +33,14 @@ async fn test_webfinger_valid_request() {
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["subject"], "acct:testuser@test.example.com");
     assert!(body["links"].is_array());
-    
+
     let links = body["links"].as_array().unwrap();
-    assert!(links.len() >= 1);
-    
+    assert!(!links.is_empty());
+
     // Check for ActivityPub link
-    let activitypub_link = links.iter().find(|link| 
-        link["rel"] == "self" && 
-        link["type"] == "application/activity+json"
-    );
+    let activitypub_link = links
+        .iter()
+        .find(|link| link["rel"] == "self" && link["type"] == "application/activity+json");
     assert!(activitypub_link.is_some());
 }
 
@@ -50,8 +50,9 @@ async fn test_webfinger_invalid_domain() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::webfinger::webfinger)
-    ).await;
+            .service(handlers::webfinger::webfinger),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/.well-known/webfinger?resource=acct:testuser@different.domain.com")
@@ -67,8 +68,9 @@ async fn test_webfinger_malformed_resource() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::webfinger::webfinger)
-    ).await;
+            .service(handlers::webfinger::webfinger),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/.well-known/webfinger?resource=invalid-resource")
@@ -84,8 +86,9 @@ async fn test_webfinger_missing_resource() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::webfinger::webfinger)
-    ).await;
+            .service(handlers::webfinger::webfinger),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/.well-known/webfinger")
@@ -102,8 +105,9 @@ async fn test_get_actor() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config.clone()))
-            .service(handlers::actor::get_actor)
-    ).await;
+            .service(handlers::actor::get_actor),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/users/alice")
@@ -127,8 +131,9 @@ async fn test_get_actor_different_username() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::actor::get_actor)
-    ).await;
+            .service(handlers::actor::get_actor),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/users/bob")
@@ -149,8 +154,9 @@ async fn test_inbox_create_activity() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::inbox::inbox)
-    ).await;
+            .service(handlers::inbox::inbox),
+    )
+    .await;
 
     let create_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
@@ -182,8 +188,9 @@ async fn test_inbox_follow_activity() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::inbox::inbox)
-    ).await;
+            .service(handlers::inbox::inbox),
+    )
+    .await;
 
     let follow_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
@@ -211,8 +218,9 @@ async fn test_inbox_unknown_activity() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::inbox::inbox)
-    ).await;
+            .service(handlers::inbox::inbox),
+    )
+    .await;
 
     let unknown_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
@@ -240,8 +248,9 @@ async fn test_get_outbox() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::outbox::get_outbox)
-    ).await;
+            .service(handlers::outbox::get_outbox),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/users/alice/outbox")
@@ -264,8 +273,9 @@ async fn test_post_outbox_create_activity() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::outbox::post_outbox)
-    ).await;
+            .service(handlers::outbox::post_outbox),
+    )
+    .await;
 
     let create_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
@@ -296,8 +306,9 @@ async fn test_post_outbox_unsupported_activity() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::outbox::post_outbox)
-    ).await;
+            .service(handlers::outbox::post_outbox),
+    )
+    .await;
 
     let follow_activity = json!({
         "@context": ["https://www.w3.org/ns/activitystreams"],
@@ -325,19 +336,21 @@ async fn test_content_type_headers() {
         App::new()
             .app_data(web::Data::new(config))
             .service(handlers::actor::get_actor)
-            .service(handlers::outbox::get_outbox)
-    ).await;
+            .service(handlers::outbox::get_outbox),
+    )
+    .await;
 
     // Test actor endpoint content type
-    let req = test::TestRequest::get()
-        .uri("/users/alice")
-        .to_request();
+    let req = test::TestRequest::get().uri("/users/alice").to_request();
 
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    
+
     let content_type = resp.headers().get("content-type").unwrap();
-    assert!(content_type.to_str().unwrap().contains("application/activity+json"));
+    assert!(content_type
+        .to_str()
+        .unwrap()
+        .contains("application/activity+json"));
 
     // Test outbox endpoint content type
     let req = test::TestRequest::get()
@@ -346,9 +359,12 @@ async fn test_content_type_headers() {
 
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    
+
     let content_type = resp.headers().get("content-type").unwrap();
-    assert!(content_type.to_str().unwrap().contains("application/activity+json"));
+    assert!(content_type
+        .to_str()
+        .unwrap()
+        .contains("application/activity+json"));
 }
 
 #[actix_web::test]
@@ -357,8 +373,9 @@ async fn test_webfinger_content_type() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::webfinger::webfinger)
-    ).await;
+            .service(handlers::webfinger::webfinger),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/.well-known/webfinger?resource=acct:testuser@test.example.com")
@@ -366,9 +383,12 @@ async fn test_webfinger_content_type() {
 
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    
+
     let content_type = resp.headers().get("content-type").unwrap();
-    assert!(content_type.to_str().unwrap().contains("application/jrd+json"));
+    assert!(content_type
+        .to_str()
+        .unwrap()
+        .contains("application/jrd+json"));
 }
 
 #[actix_web::test]
@@ -377,8 +397,9 @@ async fn test_inbox_malformed_json() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::inbox::inbox)
-    ).await;
+            .service(handlers::inbox::inbox),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/users/bob/inbox")
@@ -397,8 +418,9 @@ async fn test_outbox_malformed_json() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
-            .service(handlers::outbox::post_outbox)
-    ).await;
+            .service(handlers::outbox::post_outbox),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/users/alice/outbox")

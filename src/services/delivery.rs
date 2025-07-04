@@ -125,7 +125,7 @@ mod tests {
     fn test_delivery_service_new() {
         let config = create_test_config();
         let service = DeliveryService::new(config.clone());
-        
+
         assert_eq!(service.config.server_name, config.server_name);
         assert_eq!(service.config.server_url, config.server_url);
         assert_eq!(service.config.port, config.port);
@@ -142,7 +142,7 @@ mod tests {
             private_key_path: None,
             public_key_path: None,
         };
-        
+
         let config2 = Config {
             server_name: "Server 2".to_string(),
             server_url: "https://server2.com".to_string(),
@@ -154,7 +154,7 @@ mod tests {
 
         let service1 = DeliveryService::new(config1.clone());
         let service2 = DeliveryService::new(config2.clone());
-        
+
         assert_eq!(service1.config.server_name, "Server 1");
         assert_eq!(service1.config.actor_name, "alice");
         assert_eq!(service2.config.server_name, "Server 2");
@@ -193,12 +193,15 @@ mod tests {
     #[test]
     fn test_activity_structure() {
         let activity = create_test_activity();
-        
+
         assert_eq!(activity["type"], "Create");
         assert_eq!(activity["actor"], "https://test.example.com/users/alice");
         assert_eq!(activity["object"]["type"], "Note");
         assert_eq!(activity["object"]["content"], "Hello, world!");
-        assert!(activity["to"].as_array().unwrap().contains(&json!("https://www.w3.org/ns/activitystreams#Public")));
+        assert!(activity["to"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("https://www.w3.org/ns/activitystreams#Public")));
     }
 
     #[test]
@@ -224,14 +227,20 @@ mod tests {
         });
 
         assert_eq!(complex_activity["type"], "Follow");
-        assert_eq!(complex_activity["actor"], "https://mastodon.social/users/alice");
-        assert_eq!(complex_activity["object"], "https://pleroma.instance/users/bob");
+        assert_eq!(
+            complex_activity["actor"],
+            "https://mastodon.social/users/alice"
+        );
+        assert_eq!(
+            complex_activity["object"],
+            "https://pleroma.instance/users/bob"
+        );
         assert!(complex_activity["signature"]["type"] == "RsaSignature2017");
     }
 
     #[test]
     fn test_multiple_followers_structure() {
-        let followers = vec![
+        let followers = [
             "https://mastodon.social/users/alice/inbox".to_string(),
             "https://pleroma.instance/users/bob/inbox".to_string(),
             "https://misskey.io/users/charlie/inbox".to_string(),
@@ -245,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_public_inboxes_structure() {
-        let public_inboxes = vec![
+        let public_inboxes = [
             "https://relay.fediverse.org/inbox".to_string(),
             "https://relay.activitypub.org/inbox".to_string(),
         ];
@@ -259,7 +268,7 @@ mod tests {
     fn test_activity_cloning() {
         let activity = create_test_activity();
         let cloned_activity = activity.clone();
-        
+
         assert_eq!(activity, cloned_activity);
         assert_eq!(activity["id"], cloned_activity["id"]);
         assert_eq!(activity["type"], cloned_activity["type"]);
@@ -270,14 +279,20 @@ mod tests {
     fn test_delivery_service_config_persistence() {
         let original_config = create_test_config();
         let service = DeliveryService::new(original_config.clone());
-        
+
         // Verify that the service maintains a copy of the config
         assert_eq!(service.config.server_name, original_config.server_name);
         assert_eq!(service.config.server_url, original_config.server_url);
         assert_eq!(service.config.port, original_config.port);
         assert_eq!(service.config.actor_name, original_config.actor_name);
-        assert_eq!(service.config.private_key_path, original_config.private_key_path);
-        assert_eq!(service.config.public_key_path, original_config.public_key_path);
+        assert_eq!(
+            service.config.private_key_path,
+            original_config.private_key_path
+        );
+        assert_eq!(
+            service.config.public_key_path,
+            original_config.public_key_path
+        );
     }
 
     // Test different activity types

@@ -83,8 +83,9 @@ mod tests {
         let name = "Test User".to_string();
         let username = "testuser".to_string();
         let server_url = "https://example.com";
-        let public_key_pem = "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----".to_string();
-        
+        let public_key_pem =
+            "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----".to_string();
+
         let actor = Actor::new(
             "unused_id".to_string(),
             name.clone(),
@@ -94,25 +95,28 @@ mod tests {
         );
 
         let expected_id = "https://example.com/users/testuser";
-        
-        assert_eq!(actor.context, vec![
-            "https://www.w3.org/ns/activitystreams".to_string(),
-            "https://w3id.org/security/v1".to_string()
-        ]);
+
+        assert_eq!(
+            actor.context,
+            vec![
+                "https://www.w3.org/ns/activitystreams".to_string(),
+                "https://w3id.org/security/v1".to_string()
+            ]
+        );
         assert_eq!(actor.id, expected_id);
         assert_eq!(actor.actor_type, "Person");
         assert_eq!(actor.name, name);
         assert_eq!(actor.preferred_username, username);
         assert_eq!(actor.summary, None);
         assert_eq!(actor.url, expected_id);
-        assert_eq!(actor.inbox, format!("{}/inbox", expected_id));
-        assert_eq!(actor.outbox, format!("{}/outbox", expected_id));
-        assert_eq!(actor.followers, format!("{}/followers", expected_id));
-        assert_eq!(actor.following, format!("{}/following", expected_id));
+        assert_eq!(actor.inbox, format!("{expected_id}/inbox"));
+        assert_eq!(actor.outbox, format!("{expected_id}/outbox"));
+        assert_eq!(actor.followers, format!("{expected_id}/followers"));
+        assert_eq!(actor.following, format!("{expected_id}/following"));
         assert_eq!(actor.icon, None);
-        
+
         // Test public key
-        assert_eq!(actor.public_key.id, format!("{}#main-key", expected_id));
+        assert_eq!(actor.public_key.id, format!("{expected_id}#main-key"));
         assert_eq!(actor.public_key.key_type, "Key");
         assert_eq!(actor.public_key.owner, expected_id);
         assert_eq!(actor.public_key.public_key_pem, public_key_pem);
@@ -130,12 +134,15 @@ mod tests {
 
         let json = serde_json::to_string(&actor).unwrap();
         let deserialized: Actor = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(actor.id, deserialized.id);
         assert_eq!(actor.name, deserialized.name);
         assert_eq!(actor.preferred_username, deserialized.preferred_username);
         assert_eq!(actor.actor_type, deserialized.actor_type);
-        assert_eq!(actor.public_key.public_key_pem, deserialized.public_key.public_key_pem);
+        assert_eq!(
+            actor.public_key.public_key_pem,
+            deserialized.public_key.public_key_pem
+        );
     }
 
     #[test]
@@ -147,7 +154,7 @@ mod tests {
             "https://example.com",
             "key".to_string(),
         );
-        
+
         actor.icon = Some(Icon {
             icon_type: "Image".to_string(),
             url: "https://example.com/avatar.png".to_string(),
@@ -170,7 +177,7 @@ mod tests {
             "https://example.com",
             "key".to_string(),
         );
-        
+
         actor.summary = Some("This is a test actor".to_string());
         assert_eq!(actor.summary, Some("This is a test actor".to_string()));
     }
@@ -181,7 +188,8 @@ mod tests {
             id: "https://example.com/users/test#main-key".to_string(),
             key_type: "Key".to_string(),
             owner: "https://example.com/users/test".to_string(),
-            public_key_pem: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----".to_string(),
+            public_key_pem: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
+                .to_string(),
         };
 
         assert_eq!(public_key.id, "https://example.com/users/test#main-key");
@@ -212,7 +220,7 @@ mod tests {
             "https://example.com",
             "key".to_string(),
         );
-        
+
         let cloned = actor.clone();
         assert_eq!(actor.id, cloned.id);
         assert_eq!(actor.name, cloned.name);
@@ -232,11 +240,11 @@ mod tests {
         let base_url = "https://mastodon.social/users/alice";
         assert_eq!(actor.id, base_url);
         assert_eq!(actor.url, base_url);
-        assert_eq!(actor.inbox, format!("{}/inbox", base_url));
-        assert_eq!(actor.outbox, format!("{}/outbox", base_url));
-        assert_eq!(actor.followers, format!("{}/followers", base_url));
-        assert_eq!(actor.following, format!("{}/following", base_url));
-        assert_eq!(actor.public_key.id, format!("{}#main-key", base_url));
+        assert_eq!(actor.inbox, format!("{base_url}/inbox"));
+        assert_eq!(actor.outbox, format!("{base_url}/outbox"));
+        assert_eq!(actor.followers, format!("{base_url}/followers"));
+        assert_eq!(actor.following, format!("{base_url}/following"));
+        assert_eq!(actor.public_key.id, format!("{base_url}#main-key"));
         assert_eq!(actor.public_key.owner, base_url);
     }
 }

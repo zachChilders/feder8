@@ -32,21 +32,33 @@ impl Default for Config {
 mod tests {
     use super::*;
     use std::env;
+    use std::sync::Mutex;
+
+    // Shared mutex to prevent parallel tests from interfering with environment variables
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_config_default_values() {
+        // Use a lock to prevent parallel tests from interfering with each other
+        let _guard = ENV_LOCK.lock().unwrap();
+
         // Clear environment variables to test defaults
-        let env_vars = ["SERVER_NAME", "SERVER_URL", "PORT", "ACTOR_NAME", "PRIVATE_KEY_PATH", "PUBLIC_KEY_PATH"];
-        let original_values: Vec<_> = env_vars.iter()
-            .map(|var| env::var(var).ok())
-            .collect();
-        
+        let env_vars = [
+            "SERVER_NAME",
+            "SERVER_URL",
+            "PORT",
+            "ACTOR_NAME",
+            "PRIVATE_KEY_PATH",
+            "PUBLIC_KEY_PATH",
+        ];
+        let original_values: Vec<_> = env_vars.iter().map(|var| env::var(var).ok()).collect();
+
         for var in &env_vars {
             env::remove_var(var);
         }
 
         let config = Config::default();
-        
+
         assert_eq!(config.server_name, "Fediverse Node");
         assert_eq!(config.server_url, "http://localhost:8080");
         assert_eq!(config.port, 8080);
@@ -64,11 +76,21 @@ mod tests {
 
     #[test]
     fn test_config_from_environment() {
+        // Use a lock to prevent parallel tests from interfering with each other
+        let _guard = ENV_LOCK.lock().unwrap();
+
         // Store original values to restore later
-        let original_values: Vec<_> = ["SERVER_NAME", "SERVER_URL", "PORT", "ACTOR_NAME", "PRIVATE_KEY_PATH", "PUBLIC_KEY_PATH"]
-            .iter()
-            .map(|var| env::var(var).ok())
-            .collect();
+        let original_values: Vec<_> = [
+            "SERVER_NAME",
+            "SERVER_URL",
+            "PORT",
+            "ACTOR_NAME",
+            "PRIVATE_KEY_PATH",
+            "PUBLIC_KEY_PATH",
+        ]
+        .iter()
+        .map(|var| env::var(var).ok())
+        .collect();
 
         // Set environment variables
         env::set_var("SERVER_NAME", "Test Server");
@@ -79,16 +101,29 @@ mod tests {
         env::set_var("PUBLIC_KEY_PATH", "/path/to/public.pem");
 
         let config = Config::default();
-        
+
         assert_eq!(config.server_name, "Test Server");
         assert_eq!(config.server_url, "https://test.example.com");
         assert_eq!(config.port, 9090);
         assert_eq!(config.actor_name, "testuser");
-        assert_eq!(config.private_key_path, Some("/path/to/private.pem".to_string()));
-        assert_eq!(config.public_key_path, Some("/path/to/public.pem".to_string()));
+        assert_eq!(
+            config.private_key_path,
+            Some("/path/to/private.pem".to_string())
+        );
+        assert_eq!(
+            config.public_key_path,
+            Some("/path/to/public.pem".to_string())
+        );
 
         // Restore original values or remove if they weren't set
-        let env_vars = ["SERVER_NAME", "SERVER_URL", "PORT", "ACTOR_NAME", "PRIVATE_KEY_PATH", "PUBLIC_KEY_PATH"];
+        let env_vars = [
+            "SERVER_NAME",
+            "SERVER_URL",
+            "PORT",
+            "ACTOR_NAME",
+            "PRIVATE_KEY_PATH",
+            "PUBLIC_KEY_PATH",
+        ];
         for (i, var) in env_vars.iter().enumerate() {
             if let Some(value) = &original_values[i] {
                 env::set_var(var, value);
@@ -100,12 +135,22 @@ mod tests {
 
     #[test]
     fn test_config_invalid_port_fallback() {
+        // Use a lock to prevent parallel tests from interfering with each other
+        let _guard = ENV_LOCK.lock().unwrap();
+
+        let original_port = env::var("PORT").ok();
+
         env::set_var("PORT", "invalid_port");
-        
+
         let config = Config::default();
         assert_eq!(config.port, 8080); // Should fallback to default
-        
-        env::remove_var("PORT");
+
+        // Restore original value or remove if it wasn't set
+        if let Some(value) = original_port {
+            env::set_var("PORT", value);
+        } else {
+            env::remove_var("PORT");
+        }
     }
 
     #[test]
@@ -121,7 +166,7 @@ mod tests {
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: Config = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(config.server_name, deserialized.server_name);
         assert_eq!(config.server_url, deserialized.server_url);
         assert_eq!(config.port, deserialized.port);
@@ -134,7 +179,7 @@ mod tests {
     fn test_config_clone() {
         let config = Config::default();
         let cloned = config.clone();
-        
+
         assert_eq!(config.server_name, cloned.server_name);
         assert_eq!(config.server_url, cloned.server_url);
         assert_eq!(config.port, cloned.port);

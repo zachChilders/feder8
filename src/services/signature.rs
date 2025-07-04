@@ -56,14 +56,14 @@ mod tests {
     fn test_signature_service_new_with_key() {
         let private_key = Some("test-private-key".to_string());
         let service = SignatureService::new(private_key.clone());
-        
+
         assert_eq!(service.private_key, private_key);
     }
 
     #[test]
     fn test_signature_service_new_without_key() {
         let service = SignatureService::new(None);
-        
+
         assert_eq!(service.private_key, None);
     }
 
@@ -74,9 +74,9 @@ mod tests {
         let signature = "test-signature";
 
         let result = service.verify_signature(&headers, signature);
-        
+
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true); // Current implementation always returns true
+        assert!(result.unwrap()); // Current implementation always returns true
     }
 
     #[test]
@@ -84,15 +84,18 @@ mod tests {
         let service = SignatureService::new(Some("test-key".to_string()));
         let mut headers = HashMap::new();
         headers.insert("host".to_string(), "example.com".to_string());
-        headers.insert("date".to_string(), "Mon, 01 Jan 2024 12:00:00 GMT".to_string());
+        headers.insert(
+            "date".to_string(),
+            "Mon, 01 Jan 2024 12:00:00 GMT".to_string(),
+        );
         headers.insert("digest".to_string(), "SHA-256=hash".to_string());
-        
+
         let signature = "keyId=\"https://example.com/users/alice#main-key\",headers=\"(request-target) host date digest\",signature=\"base64signature\"";
 
         let result = service.verify_signature(&headers, signature);
-        
+
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true); // Current implementation always returns true
+        assert!(result.unwrap()); // Current implementation always returns true
     }
 
     #[test]
@@ -103,7 +106,7 @@ mod tests {
         let headers = HashMap::new();
 
         let result = service.sign_request(method, url, &headers);
-        
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "signature-placeholder"); // Current implementation returns placeholder
     }
@@ -115,12 +118,18 @@ mod tests {
         let url = "https://example.com/users/bob/inbox";
         let mut headers = HashMap::new();
         headers.insert("host".to_string(), "example.com".to_string());
-        headers.insert("date".to_string(), "Mon, 01 Jan 2024 12:00:00 GMT".to_string());
-        headers.insert("content-type".to_string(), "application/activity+json".to_string());
+        headers.insert(
+            "date".to_string(),
+            "Mon, 01 Jan 2024 12:00:00 GMT".to_string(),
+        );
+        headers.insert(
+            "content-type".to_string(),
+            "application/activity+json".to_string(),
+        );
         headers.insert("digest".to_string(), "SHA-256=hashedcontent".to_string());
 
         let result = service.sign_request(method, url, &headers);
-        
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "signature-placeholder"); // Current implementation returns placeholder
     }
@@ -133,7 +142,7 @@ mod tests {
         let headers = HashMap::new();
 
         let result = service.sign_request(method, url, &headers);
-        
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "signature-placeholder"); // Current implementation returns placeholder regardless
     }
@@ -145,9 +154,9 @@ mod tests {
         let signature = "";
 
         let result = service.verify_signature(&headers, signature);
-        
+
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true); // Current implementation always returns true
+        assert!(result.unwrap()); // Current implementation always returns true
     }
 
     #[test]
@@ -157,10 +166,13 @@ mod tests {
         let url = "https://example.com/users/alice";
         let mut headers = HashMap::new();
         headers.insert("host".to_string(), "example.com".to_string());
-        headers.insert("date".to_string(), "Mon, 01 Jan 2024 12:00:00 GMT".to_string());
+        headers.insert(
+            "date".to_string(),
+            "Mon, 01 Jan 2024 12:00:00 GMT".to_string(),
+        );
 
         let result = service.sign_request(method, url, &headers);
-        
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "signature-placeholder");
     }
@@ -186,17 +198,26 @@ mod tests {
         let service = SignatureService::new(Some("test-key".to_string()));
         let mut headers = HashMap::new();
         headers.insert("host".to_string(), "mastodon.social".to_string());
-        headers.insert("date".to_string(), "Tue, 07 Jun 2014 20:51:35 GMT".to_string());
-        headers.insert("content-type".to_string(), "application/activity+json".to_string());
-        headers.insert("digest".to_string(), "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=".to_string());
+        headers.insert(
+            "date".to_string(),
+            "Tue, 07 Jun 2014 20:51:35 GMT".to_string(),
+        );
+        headers.insert(
+            "content-type".to_string(),
+            "application/activity+json".to_string(),
+        );
+        headers.insert(
+            "digest".to_string(),
+            "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=".to_string(),
+        );
         headers.insert("content-length".to_string(), "1234".to_string());
         headers.insert("user-agent".to_string(), "Fediverse-Server/1.0".to_string());
 
         let complex_signature = "keyId=\"https://my-example.com/actor#main-key\",algorithm=\"rsa-sha256\",headers=\"(request-target) host date digest content-type\",signature=\"qdx+H7PHHDZgy4y/Ahn9Tny9V3GP6YgBPyUXMmoxWtLbHpUnXS2mg2+SbrQDMCJypxBLSPQR2aAjn7ndmw2iicw3HMbe8VfEdKFYRqzic+efkb3nndiv/x1xSHDJWeSWkx3ButlYSuBskLu6kd9Fswtemr3lgdDEmn04swr2Os0=\"";
 
         let result = service.verify_signature(&headers, complex_signature);
-        
+
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true); // Current implementation always returns true
+        assert!(result.unwrap()); // Current implementation always returns true
     }
 }
