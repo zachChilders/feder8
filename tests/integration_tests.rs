@@ -1,5 +1,5 @@
 use actix_web::{http::StatusCode, test, web, App};
-use fediverse::{config::Config, handlers, models::Actor};
+use feder8::{config::Config, handlers, models::Actor};
 use serde_json::{json, Value};
 
 fn create_test_config() -> Config {
