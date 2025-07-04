@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) as count FROM activities WHERE to_recipients LIKE '%' || ? || '%' OR cc_recipients LIKE '%' || ? || '%'",
+  "describe": {
+    "columns": [
+      {
+        "name": "count",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3d94fcb7c11ee871d88bda1af6a3da9567531d31822ddea0ffe0cfcd37de82c4"
+}

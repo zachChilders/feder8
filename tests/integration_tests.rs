@@ -1,6 +1,12 @@
 use actix_web::{http::StatusCode, test, web, App};
-use feder8::{config::Config, handlers, models::Actor};
+use feder8::{
+    config::Config,
+    database::{create_configured_mock_database, DatabaseRef},
+    handlers,
+    models::Actor,
+};
 use serde_json::{json, Value};
+use std::sync::Arc;
 
 fn create_test_config() -> Config {
     Config {
@@ -102,9 +108,11 @@ async fn test_webfinger_missing_resource() {
 #[actix_web::test]
 async fn test_get_actor() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config.clone()))
+            .app_data(web::Data::new(db))
             .service(handlers::actor::get_actor),
     )
     .await;
@@ -128,9 +136,11 @@ async fn test_get_actor() {
 #[actix_web::test]
 async fn test_get_actor_different_username() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::actor::get_actor),
     )
     .await;
@@ -145,15 +155,39 @@ async fn test_get_actor_different_username() {
 
     let body: Actor = test::read_body_json(resp).await;
     assert_eq!(body.preferred_username, "bob");
-    assert_eq!(body.name, "bob");
+    assert_eq!(body.name, "Test User bob");
 }
 
 #[actix_web::test]
 async fn test_inbox_create_activity() {
     let config = create_test_config();
+    let mut mock = feder8::database::MockDatabase::new();
+
+    // Set up expectations for inbox processing
+    mock.expect_get_actor_by_username().returning(|username| {
+        Ok(Some(feder8::database::DbActor {
+            id: format!("https://test.example.com/users/{}", username),
+            username: username.to_string(),
+            name: format!("Test User {}", username),
+            summary: Some("A test user".to_string()),
+            public_key_pem: "test_key".to_string(),
+            private_key_pem: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }))
+    });
+
+    mock.expect_get_note_by_id().returning(|_| Ok(None)); // Note doesn't exist yet
+
+    mock.expect_create_note().returning(|_| Ok(()));
+
+    mock.expect_create_activity().returning(|_| Ok(()));
+
+    let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::inbox::inbox),
     )
     .await;
@@ -185,9 +219,11 @@ async fn test_inbox_create_activity() {
 #[actix_web::test]
 async fn test_inbox_follow_activity() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::inbox::inbox),
     )
     .await;
@@ -215,9 +251,11 @@ async fn test_inbox_follow_activity() {
 #[actix_web::test]
 async fn test_inbox_unknown_activity() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::inbox::inbox),
     )
     .await;
@@ -245,9 +283,11 @@ async fn test_inbox_unknown_activity() {
 #[actix_web::test]
 async fn test_get_outbox() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::outbox::get_outbox),
     )
     .await;
@@ -262,17 +302,39 @@ async fn test_get_outbox() {
 
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["type"], "OrderedCollection");
-    assert_eq!(body["totalItems"], 0); // Empty outbox initially
+    assert_eq!(body["totalItems"], 5); // Mock returns 5 items
     assert!(body["orderedItems"].is_array());
-    assert!(body["orderedItems"].as_array().unwrap().is_empty());
+    assert!(body["orderedItems"].as_array().unwrap().is_empty()); // But activities list is empty
 }
 
 #[actix_web::test]
 async fn test_post_outbox_create_activity() {
     let config = create_test_config();
+    let mut mock = feder8::database::MockDatabase::new();
+
+    // Set up expectations for outbox processing
+    mock.expect_get_actor_by_username().returning(|username| {
+        Ok(Some(feder8::database::DbActor {
+            id: format!("https://test.example.com/users/{}", username),
+            username: username.to_string(),
+            name: format!("Test User {}", username),
+            summary: Some("A test user".to_string()),
+            public_key_pem: "test_key".to_string(),
+            private_key_pem: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }))
+    });
+
+    mock.expect_create_note().returning(|_| Ok(()));
+
+    mock.expect_create_activity().returning(|_| Ok(()));
+
+    let db: DatabaseRef = Arc::new(mock);
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::outbox::post_outbox),
     )
     .await;
@@ -303,9 +365,11 @@ async fn test_post_outbox_create_activity() {
 #[actix_web::test]
 async fn test_post_outbox_unsupported_activity() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::outbox::post_outbox),
     )
     .await;
@@ -332,9 +396,11 @@ async fn test_post_outbox_unsupported_activity() {
 #[actix_web::test]
 async fn test_content_type_headers() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::actor::get_actor)
             .service(handlers::outbox::get_outbox),
     )
@@ -394,9 +460,11 @@ async fn test_webfinger_content_type() {
 #[actix_web::test]
 async fn test_inbox_malformed_json() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::inbox::inbox),
     )
     .await;
@@ -415,9 +483,11 @@ async fn test_inbox_malformed_json() {
 #[actix_web::test]
 async fn test_outbox_malformed_json() {
     let config = create_test_config();
+    let db: DatabaseRef = Arc::new(create_configured_mock_database());
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(config))
+            .app_data(web::Data::new(db))
             .service(handlers::outbox::post_outbox),
     )
     .await;

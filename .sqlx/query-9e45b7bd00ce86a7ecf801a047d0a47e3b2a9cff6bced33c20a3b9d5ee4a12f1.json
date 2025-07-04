@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, actor_id, activity_type, object, to_recipients, cc_recipients, published, created_at FROM activities WHERE actor_id = ? ORDER BY published DESC LIMIT ? OFFSET ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "actor_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "activity_type",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "object",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "to_recipients",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "cc_recipients",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "published",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9e45b7bd00ce86a7ecf801a047d0a47e3b2a9cff6bced33c20a3b9d5ee4a12f1"
+}

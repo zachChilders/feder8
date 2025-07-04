@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE actors \n            SET name = ?, summary = ?, public_key_pem = ?, private_key_pem = ?, updated_at = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "40ee01e758500b9104845950ce8c6cfaeb7152fca89e041b1af5f2cf2cbdd712"
+}
