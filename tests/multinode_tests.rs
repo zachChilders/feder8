@@ -1,5 +1,9 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use feder8::{config::Config, handlers};
+use feder8::{
+    config::Config,
+    database::{create_configured_mock_database, DatabaseRef},
+    handlers,
+};
 use rand::Rng;
 use reqwest::Client;
 use serde_json::json;
@@ -15,8 +19,10 @@ static NODE_COUNT: usize = 7;
 mod test_harness {
     use super::*;
 
+    type NodeHandles = Arc<Mutex<Vec<JoinHandle<()>>>>;
+
     static INIT: Once = Once::new();
-    static NODES: Mutex<Option<Arc<Mutex<Vec<JoinHandle<()>>>>>> = Mutex::new(None);
+    static NODES: Mutex<Option<NodeHandles>> = Mutex::new(None);
 
     pub struct TestContext {
         pub client: Client,
@@ -84,10 +90,14 @@ mod test_harness {
 
         let config_clone = config.clone();
         let server_handle = tokio::spawn(async move {
+            // Initialize database (using mock for tests)
+            let db: DatabaseRef = Arc::new(create_configured_mock_database());
+
             let _ = HttpServer::new(move || {
                 App::new()
                     .wrap(Logger::default())
                     .app_data(web::Data::new(config_clone.clone()))
+                    .app_data(web::Data::new(db.clone()))
                     .service(handlers::webfinger::webfinger)
                     .service(handlers::actor::get_actor)
                     .service(handlers::inbox::inbox)
@@ -116,7 +126,7 @@ mod test_harness {
             let actor_name = format!("actor{}", i + 1);
             handles.push(start_node(port, &actor_name).await);
         }
-        let nodes = Arc::new(Mutex::new(handles));
+        let nodes: NodeHandles = Arc::new(Mutex::new(handles));
         *NODES.lock().unwrap() = Some(nodes);
     }
 
