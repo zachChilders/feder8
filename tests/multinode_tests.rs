@@ -20,7 +20,7 @@ mod test_harness {
     use super::*;
 
     type NodeHandles = Arc<Mutex<Vec<JoinHandle<()>>>>;
-    
+
     static INIT: Once = Once::new();
     static NODES: Mutex<Option<NodeHandles>> = Mutex::new(None);
 
