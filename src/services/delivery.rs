@@ -15,17 +15,17 @@ pub struct DeliveryService {
 #[allow(dead_code)]
 impl DeliveryService {
     pub fn new(config: Config, client: Arc<dyn HttpClient>) -> Self {
-        Self {
-            client,
-            config,
-        }
+        Self { client, config }
     }
 
     pub async fn deliver_activity(&self, inbox_url: &str, activity: Value) -> Result<()> {
         info!("Delivering activity to inbox: {}", inbox_url);
 
         let mut headers = HashMap::new();
-        headers.insert("Content-Type".to_string(), "application/activity+json".to_string());
+        headers.insert(
+            "Content-Type".to_string(),
+            "application/activity+json".to_string(),
+        );
         headers.insert(
             "User-Agent".to_string(),
             format!("Fediverse-Node/{}", env!("CARGO_PKG_VERSION")),
@@ -94,7 +94,7 @@ impl DeliveryService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::{HttpClient, HttpRequest, HttpResponse, StatusCode};
+    use crate::http::{ClientResponse as HttpResponse, HttpClient, HttpRequest, StatusCode};
     use serde_json::json;
     use std::sync::Arc;
 

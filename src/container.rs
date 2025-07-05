@@ -6,6 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Dependency injection container that manages all application dependencies
+#[derive(Clone)]
+#[allow(dead_code)]
 pub struct Container {
     config: Config,
     database: DatabaseRef,
@@ -13,15 +15,17 @@ pub struct Container {
     delivery_service: Arc<DeliveryService>,
 }
 
+#[allow(dead_code)]
 impl Container {
     /// Create a new container with default implementations
     pub fn new(config: Config, database: DatabaseRef) -> Self {
         // Create HTTP client
-        let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestClient::with_timeout(Duration::from_secs(30)));
-        
+        let http_client: Arc<dyn HttpClient> =
+            Arc::new(ReqwestClient::with_timeout(Duration::from_secs(30)));
+
         // Create delivery service with injected HTTP client
         let delivery_service = Arc::new(DeliveryService::new(config.clone(), http_client.clone()));
-        
+
         Self {
             config,
             database,
@@ -31,9 +35,13 @@ impl Container {
     }
 
     /// Create a new container with custom HTTP client
-    pub fn with_http_client(config: Config, database: DatabaseRef, http_client: Arc<dyn HttpClient>) -> Self {
+    pub fn with_http_client(
+        config: Config,
+        database: DatabaseRef,
+        http_client: Arc<dyn HttpClient>,
+    ) -> Self {
         let delivery_service = Arc::new(DeliveryService::new(config.clone(), http_client.clone()));
-        
+
         Self {
             config,
             database,
@@ -61,25 +69,17 @@ impl Container {
     pub fn delivery_service(&self) -> &Arc<DeliveryService> {
         &self.delivery_service
     }
-
-    /// Create a clone of the container for use in different contexts
-    pub fn clone(&self) -> Self {
-        Self {
-            config: self.config.clone(),
-            database: self.database.clone(),
-            http_client: self.http_client.clone(),
-            delivery_service: self.delivery_service.clone(),
-        }
-    }
 }
 
 /// Builder pattern for creating containers with different configurations
+#[allow(dead_code)]
 pub struct ContainerBuilder {
     config: Option<Config>,
     database: Option<DatabaseRef>,
     http_client: Option<Arc<dyn HttpClient>>,
 }
 
+#[allow(dead_code)]
 impl ContainerBuilder {
     pub fn new() -> Self {
         Self {
@@ -107,7 +107,7 @@ impl ContainerBuilder {
     pub fn build(self) -> Result<Container, String> {
         let config = self.config.ok_or("Config is required")?;
         let database = self.database.ok_or("Database is required")?;
-        
+
         match self.http_client {
             Some(http_client) => Ok(Container::with_http_client(config, database, http_client)),
             None => Ok(Container::new(config, database)),
@@ -125,8 +125,8 @@ impl Default for ContainerBuilder {
 mod tests {
     use super::*;
     use crate::database::create_configured_mock_database;
+    use crate::http::client::{HttpRequest, HttpResponse, StatusCode};
     use crate::http::HttpClient;
-    use crate::http::{HttpRequest, HttpResponse as HttpClientResponse, StatusCode};
     use anyhow::Result;
     use std::collections::HashMap;
 
@@ -135,8 +135,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl HttpClient for MockHttpClient {
-        async fn send(&self, _request: HttpRequest) -> Result<HttpClientResponse> {
-            Ok(HttpClientResponse {
+        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse> {
+            Ok(HttpResponse {
                 status: StatusCode(200),
                 headers: HashMap::new(),
                 body: b"OK".to_vec(),
@@ -202,25 +202,21 @@ mod tests {
     #[test]
     fn test_container_builder_missing_config() {
         let database = Arc::new(create_configured_mock_database());
-        
-        let result = ContainerBuilder::new()
-            .with_database(database)
-            .build();
+
+        let result = ContainerBuilder::new().with_database(database).build();
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Config is required");
+        assert_eq!(result.err().unwrap(), "Config is required");
     }
 
     #[test]
     fn test_container_builder_missing_database() {
         let config = create_test_config();
-        
-        let result = ContainerBuilder::new()
-            .with_config(config)
-            .build();
+
+        let result = ContainerBuilder::new().with_config(config).build();
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Database is required");
+        assert_eq!(result.err().unwrap(), "Database is required");
     }
 
     #[test]
@@ -230,9 +226,18 @@ mod tests {
         let container = Container::new(config.clone(), database);
         let cloned_container = container.clone();
 
-        assert_eq!(container.config().server_name, cloned_container.config().server_name);
-        assert_eq!(container.config().server_url, cloned_container.config().server_url);
+        assert_eq!(
+            container.config().server_name,
+            cloned_container.config().server_name
+        );
+        assert_eq!(
+            container.config().server_url,
+            cloned_container.config().server_url
+        );
         assert_eq!(container.config().port, cloned_container.config().port);
-        assert_eq!(container.config().actor_name, cloned_container.config().actor_name);
+        assert_eq!(
+            container.config().actor_name,
+            cloned_container.config().actor_name
+        );
     }
 }

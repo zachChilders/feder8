@@ -1,14 +1,14 @@
 mod config;
+mod container;
 mod database;
 mod handlers;
+mod http;
 mod models;
 mod services;
-mod http;
-mod container;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use database::{create_configured_mock_database, DatabaseRef};
 use container::Container;
+use database::{create_configured_mock_database, DatabaseRef};
 use std::sync::Arc;
 
 #[actix_web::main]

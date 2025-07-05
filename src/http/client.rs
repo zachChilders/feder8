@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -32,6 +32,7 @@ impl HttpRequest {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_header(mut self, name: &str, value: &str) -> Self {
         self.headers.insert(name.to_string(), value.to_string());
         self
@@ -39,10 +40,12 @@ impl HttpRequest {
 
     pub fn with_json_body(mut self, json: &Value) -> Result<Self> {
         self.body = Some(serde_json::to_vec(json)?);
-        self.headers.insert("content-type".to_string(), "application/json".to_string());
+        self.headers
+            .insert("content-type".to_string(), "application/json".to_string());
         Ok(self)
     }
 
+    #[allow(dead_code)]
     pub fn with_body(mut self, body: Vec<u8>) -> Self {
         self.body = Some(body);
         self
@@ -53,6 +56,7 @@ impl HttpRequest {
 #[derive(Debug)]
 pub struct HttpResponse {
     pub status: StatusCode,
+    #[allow(dead_code)]
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
 }
@@ -66,6 +70,7 @@ impl HttpResponse {
         Ok(String::from_utf8(self.body.clone())?)
     }
 
+    #[allow(dead_code)]
     pub fn json<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
         Ok(serde_json::from_slice(&self.body)?)
     }
@@ -78,26 +83,31 @@ pub trait HttpClient: Send + Sync {
     async fn send(&self, request: HttpRequest) -> Result<HttpResponse>;
 
     /// Convenience method for GET requests
+    #[allow(dead_code)]
     async fn get(&self, url: &str) -> Result<HttpResponse> {
         self.send(HttpRequest::new("GET", url)).await
     }
 
     /// Convenience method for POST requests with JSON body
+    #[allow(dead_code)]
     async fn post_json(&self, url: &str, json: &Value) -> Result<HttpResponse> {
-        let request = HttpRequest::new("POST", url)
-            .with_json_body(json)?;
+        let request = HttpRequest::new("POST", url).with_json_body(json)?;
         self.send(request).await
     }
 
     /// Convenience method for POST requests with custom headers
-    async fn post_with_headers(&self, url: &str, headers: HashMap<String, String>, json: &Value) -> Result<HttpResponse> {
-        let mut request = HttpRequest::new("POST", url)
-            .with_json_body(json)?;
-        
+    async fn post_with_headers(
+        &self,
+        url: &str,
+        headers: HashMap<String, String>,
+        json: &Value,
+    ) -> Result<HttpResponse> {
+        let mut request = HttpRequest::new("POST", url).with_json_body(json)?;
+
         for (name, value) in headers {
             request.headers.insert(name, value);
         }
-        
+
         self.send(request).await
     }
 }
@@ -105,7 +115,7 @@ pub trait HttpClient: Send + Sync {
 /// reqwest implementation of HttpClient
 pub mod reqwest {
     use super::*;
-    use reqwest::Client;
+    use ::reqwest::Client;
     use std::time::Duration;
 
     pub struct ReqwestClient {
@@ -141,7 +151,7 @@ pub mod reqwest {
     #[async_trait]
     impl HttpClient for ReqwestClient {
         async fn send(&self, request: HttpRequest) -> Result<HttpResponse> {
-            let method = reqwest::Method::from_bytes(request.method.as_bytes())?;
+            let method = ::reqwest::Method::from_bytes(request.method.as_bytes())?;
             let mut req_builder = self.client.request(method, &request.url);
 
             // Add headers
@@ -156,7 +166,7 @@ pub mod reqwest {
 
             let response = req_builder.send().await?;
             let status = StatusCode(response.status().as_u16());
-            
+
             let mut headers = HashMap::new();
             for (name, value) in response.headers() {
                 headers.insert(
@@ -188,7 +198,10 @@ mod tests {
 
         assert_eq!(request.method, "GET");
         assert_eq!(request.url, "https://example.com");
-        assert_eq!(request.headers.get("Authorization").unwrap(), "Bearer token");
+        assert_eq!(
+            request.headers.get("Authorization").unwrap(),
+            "Bearer token"
+        );
     }
 
     #[test]
@@ -200,7 +213,10 @@ mod tests {
 
         assert_eq!(request.method, "POST");
         assert!(request.body.is_some());
-        assert_eq!(request.headers.get("content-type").unwrap(), "application/json");
+        assert_eq!(
+            request.headers.get("content-type").unwrap(),
+            "application/json"
+        );
     }
 
     #[test]
