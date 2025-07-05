@@ -94,7 +94,7 @@ impl DeliveryService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::{ClientResponse as HttpResponse, HttpClient, HttpRequest, StatusCode};
+    use crate::http::{HttpResponse, HttpClient, HttpRequest, StatusCode};
     use serde_json::json;
     use std::sync::Arc;
 
