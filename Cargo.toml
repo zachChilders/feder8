@@ -1,3 +1,9 @@
+[workspace]
+members = [
+    ".",
+    "src/firmware"
+]
+
 [package]
 name = "feder8"
 version = "0.1.0"
@@ -24,4 +30,12 @@ actix-rt = "2.7"
 tokio-test = "0.4"
 tempfile = "3.0"
 rand = "0.8"
+
+# Profile configurations for workspace
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true
+opt-level = "z"
 
