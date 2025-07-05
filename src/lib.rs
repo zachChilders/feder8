@@ -10,5 +10,5 @@ pub mod services;
 pub use config::Config;
 pub use container::Container;
 pub use database::{Database, DatabaseRef, MockDatabase};
-pub use http::{HttpClient, HttpServer};
+pub use http::HttpClient;
 pub use models::{Actor, OrderedCollection};
