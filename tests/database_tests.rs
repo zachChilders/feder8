@@ -1,6 +1,6 @@
 use chrono::Utc;
 use feder8::database::{
-    create_configured_mock_database, Database, DatabaseRef, DbActivity, DbActor, DbFollowRelation,
+    create_configured_mock_database, DatabaseRef, DbActivity, DbActor, DbFollowRelation,
     DbNote, MockDatabase,
 };
 use mockall::predicate::*;
