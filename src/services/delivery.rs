@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::http::HttpClient;
+use crate::http::client::HttpClient;
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -94,7 +94,7 @@ impl DeliveryService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::{HttpResponse, HttpClient, HttpRequest, StatusCode};
+    use crate::http::client::{HttpClient, HttpRequest, HttpResponse, StatusCode};
     use serde_json::json;
     use std::sync::Arc;
 
