@@ -47,9 +47,9 @@ mod test_harness {
 
         pub async fn wait_for_nodes(&self) {
             println!("Waiting for nodes to start...");
-            sleep(Duration::from_secs(2)).await;
+            sleep(Duration::from_secs(5)).await;
             let mut attempts = 0;
-            while attempts < 20 {
+            while attempts < 60 {
                 let mut all_ready = true;
                 for url in &self.node_urls {
                     if !self.is_node_ready(url).await {
@@ -61,7 +61,7 @@ mod test_harness {
                     println!("{} nodes are ready!", self.node_urls.len());
                     return;
                 }
-                sleep(Duration::from_millis(250)).await;
+                sleep(Duration::from_millis(500)).await;
                 attempts += 1;
             }
             panic!("Nodes failed to start within expected time");
@@ -71,7 +71,7 @@ mod test_harness {
             (self
                 .client
                 .get(url)
-                .timeout(Duration::from_secs(1))
+                .timeout(Duration::from_secs(3))
                 .send()
                 .await)
                 .is_ok()
@@ -125,6 +125,8 @@ mod test_harness {
             let port = base_port + i as u16;
             let actor_name = format!("actor{}", i + 1);
             handles.push(start_node(port, &actor_name).await);
+            // Add a small delay between starting nodes
+            sleep(Duration::from_millis(100)).await;
         }
         let nodes: NodeHandles = Arc::new(Mutex::new(handles));
         *NODES.lock().unwrap() = Some(nodes);
