@@ -1,37 +1,39 @@
 use crate::config::Config;
+use crate::http::HttpClient;
 use anyhow::Result;
-use reqwest::Client;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 #[allow(dead_code)]
 pub struct DeliveryService {
-    client: Client,
+    client: Arc<dyn HttpClient>,
     config: Config,
 }
 
 #[allow(dead_code)]
 impl DeliveryService {
-    pub fn new(config: Config) -> Self {
-        Self {
-            client: Client::new(),
-            config,
-        }
+    pub fn new(config: Config, client: Arc<dyn HttpClient>) -> Self {
+        Self { client, config }
     }
 
     pub async fn deliver_activity(&self, inbox_url: &str, activity: Value) -> Result<()> {
         info!("Delivering activity to inbox: {}", inbox_url);
 
+        let mut headers = HashMap::new();
+        headers.insert(
+            "Content-Type".to_string(),
+            "application/activity+json".to_string(),
+        );
+        headers.insert(
+            "User-Agent".to_string(),
+            format!("Fediverse-Node/{}", env!("CARGO_PKG_VERSION")),
+        );
+
         let response = self
             .client
-            .post(inbox_url)
-            .header("Content-Type", "application/activity+json")
-            .header(
-                "User-Agent",
-                format!("Fediverse-Node/{}", env!("CARGO_PKG_VERSION")),
-            )
-            .json(&activity)
-            .send()
+            .post_with_headers(inbox_url, headers, &activity)
             .await?;
 
         if response.status().is_success() {
@@ -40,9 +42,9 @@ impl DeliveryService {
             warn!(
                 "Failed to deliver activity to {}: {}",
                 inbox_url,
-                response.status()
+                response.status().0
             );
-            if let Ok(error_text) = response.text().await {
+            if let Ok(error_text) = response.text() {
                 error!("Error response: {}", error_text);
             }
         }
@@ -92,7 +94,39 @@ impl DeliveryService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::http::{ClientResponse as HttpResponse, HttpClient, HttpRequest, StatusCode};
     use serde_json::json;
+    use std::sync::Arc;
+
+    // Mock HTTP client for testing
+    struct MockHttpClient {
+        should_succeed: bool,
+    }
+
+    impl MockHttpClient {
+        fn new(should_succeed: bool) -> Self {
+            Self { should_succeed }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl HttpClient for MockHttpClient {
+        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse> {
+            if self.should_succeed {
+                Ok(HttpResponse {
+                    status: StatusCode(200),
+                    headers: std::collections::HashMap::new(),
+                    body: b"OK".to_vec(),
+                })
+            } else {
+                Ok(HttpResponse {
+                    status: StatusCode(500),
+                    headers: std::collections::HashMap::new(),
+                    body: b"Internal Server Error".to_vec(),
+                })
+            }
+        }
+    }
 
     fn create_test_config() -> Config {
         Config {
@@ -124,7 +158,8 @@ mod tests {
     #[test]
     fn test_delivery_service_new() {
         let config = create_test_config();
-        let service = DeliveryService::new(config.clone());
+        let client = Arc::new(MockHttpClient::new(true));
+        let service = DeliveryService::new(config.clone(), client);
 
         assert_eq!(service.config.server_name, config.server_name);
         assert_eq!(service.config.server_url, config.server_url);
@@ -152,8 +187,10 @@ mod tests {
             public_key_path: Some("/path/to/pub".to_string()),
         };
 
-        let service1 = DeliveryService::new(config1.clone());
-        let service2 = DeliveryService::new(config2.clone());
+        let client1 = Arc::new(MockHttpClient::new(true));
+        let client2 = Arc::new(MockHttpClient::new(true));
+        let service1 = DeliveryService::new(config1.clone(), client1);
+        let service2 = DeliveryService::new(config2.clone(), client2);
 
         assert_eq!(service1.config.server_name, "Server 1");
         assert_eq!(service1.config.actor_name, "alice");
@@ -169,7 +206,8 @@ mod tests {
     #[tokio::test]
     async fn test_deliver_to_followers_empty_list() {
         let config = create_test_config();
-        let service = DeliveryService::new(config);
+        let client = Arc::new(MockHttpClient::new(true));
+        let service = DeliveryService::new(config, client);
         let activity = create_test_activity();
         let followers = vec![];
 
@@ -181,7 +219,8 @@ mod tests {
     #[tokio::test]
     async fn test_deliver_to_public_empty_list() {
         let config = create_test_config();
-        let service = DeliveryService::new(config);
+        let client = Arc::new(MockHttpClient::new(true));
+        let service = DeliveryService::new(config, client);
         let activity = create_test_activity();
         let public_inboxes = vec![];
 
@@ -278,7 +317,8 @@ mod tests {
     #[test]
     fn test_delivery_service_config_persistence() {
         let original_config = create_test_config();
-        let service = DeliveryService::new(original_config.clone());
+        let client = Arc::new(MockHttpClient::new(true));
+        let service = DeliveryService::new(original_config.clone(), client);
 
         // Verify that the service maintains a copy of the config
         assert_eq!(service.config.server_name, original_config.server_name);

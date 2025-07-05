@@ -1,10 +1,13 @@
 mod config;
+mod container;
 mod database;
 mod handlers;
+mod http;
 mod models;
 mod services;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use container::Container;
 use database::{create_configured_mock_database, DatabaseRef};
 use std::sync::Arc;
 
@@ -23,13 +26,17 @@ async fn main() -> std::io::Result<()> {
     let db: DatabaseRef = Arc::new(create_configured_mock_database());
     tracing::info!("Database initialized (using mock)");
 
-    let config_clone = config.clone();
-    let db_clone = db.clone();
+    // Initialize dependency injection container
+    let container = Container::new(config.clone(), db);
+    tracing::info!("Dependency injection container initialized");
+
+    let container_clone = container.clone();
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
-            .app_data(web::Data::new(config_clone.clone()))
-            .app_data(web::Data::new(db_clone.clone()))
+            .app_data(web::Data::new(container_clone.config().clone()))
+            .app_data(web::Data::new(container_clone.database().clone()))
+            .app_data(web::Data::new(container_clone.clone()))
             .service(handlers::webfinger::webfinger)
             .service(handlers::actor::get_actor)
             .service(handlers::inbox::inbox)
