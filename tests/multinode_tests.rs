@@ -67,7 +67,8 @@ mod test_harness {
                 .get(url)
                 .timeout(Duration::from_secs(1))
                 .send()
-                .await).is_ok()
+                .await)
+                .is_ok()
         }
     }
 
