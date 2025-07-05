@@ -19,8 +19,10 @@ static NODE_COUNT: usize = 7;
 mod test_harness {
     use super::*;
 
+    type NodeHandles = Arc<Mutex<Vec<JoinHandle<()>>>>;
+    
     static INIT: Once = Once::new();
-    static NODES: Mutex<Option<Arc<Mutex<Vec<JoinHandle<()>>>>>> = Mutex::new(None);
+    static NODES: Mutex<Option<NodeHandles>> = Mutex::new(None);
 
     pub struct TestContext {
         pub client: Client,
@@ -124,7 +126,7 @@ mod test_harness {
             let actor_name = format!("actor{}", i + 1);
             handles.push(start_node(port, &actor_name).await);
         }
-        let nodes = Arc::new(Mutex::new(handles));
+        let nodes: NodeHandles = Arc::new(Mutex::new(handles));
         *NODES.lock().unwrap() = Some(nodes);
     }
 
