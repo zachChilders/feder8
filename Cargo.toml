@@ -1,3 +1,9 @@
+[workspace]
+members = [
+    ".",
+    "src/firmware"
+]
+
 [package]
 name = "feder8"
 version = "0.1.0"
@@ -24,4 +30,10 @@ actix-rt = "2.7"
 tokio-test = "0.4"
 tempfile = "3.0"
 rand = "0.8"
+
+# Custom aliases for firmware development
+[alias]
+firmware-qemu = "run --manifest-path src/firmware/Cargo.toml --bin feder8-firmware"
+firmware-build = "build --manifest-path src/firmware/Cargo.toml --release"
+firmware-sim = "run --manifest-path src/firmware/Cargo.toml --bin run-sim"
 

@@ -7,6 +7,10 @@ edition = "2021"
 name = "feder8-firmware"
 path = "src/main.rs"
 
+[[bin]]
+name = "run-sim"
+path = "src/sim_runner.rs"
+
 [dependencies]
 esp-idf-sys = { version = "0.33", features = ["binstart"] }
 esp-idf-hal = "0.42"
