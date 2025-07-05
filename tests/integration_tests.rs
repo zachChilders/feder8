@@ -166,9 +166,9 @@ async fn test_inbox_create_activity() {
     // Set up expectations for inbox processing
     mock.expect_get_actor_by_username().returning(|username| {
         Ok(Some(feder8::database::DbActor {
-            id: format!("https://test.example.com/users/{}", username),
+            id: format!("https://test.example.com/users/{username}"),
             username: username.to_string(),
-            name: format!("Test User {}", username),
+            name: format!("Test User {username}"),
             summary: Some("A test user".to_string()),
             public_key_pem: "test_key".to_string(),
             private_key_pem: None,
@@ -315,9 +315,9 @@ async fn test_post_outbox_create_activity() {
     // Set up expectations for outbox processing
     mock.expect_get_actor_by_username().returning(|username| {
         Ok(Some(feder8::database::DbActor {
-            id: format!("https://test.example.com/users/{}", username),
+            id: format!("https://test.example.com/users/{username}"),
             username: username.to_string(),
-            name: format!("Test User {}", username),
+            name: format!("Test User {username}"),
             summary: Some("A test user".to_string()),
             public_key_pem: "test_key".to_string(),
             private_key_pem: None,

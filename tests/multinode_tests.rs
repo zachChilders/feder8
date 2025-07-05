@@ -62,23 +62,19 @@ mod test_harness {
         }
 
         async fn is_node_ready(&self, url: &str) -> bool {
-            match self
+            (self
                 .client
                 .get(url)
                 .timeout(Duration::from_secs(1))
                 .send()
-                .await
-            {
-                Ok(_) => true,
-                Err(_) => false,
-            }
+                .await).is_ok()
         }
     }
 
     async fn start_node(port: u16, actor_name: &str) -> JoinHandle<()> {
         let config = Config {
-            server_name: format!("Test Node {}", actor_name),
-            server_url: format!("http://localhost:{}", port),
+            server_name: format!("Test Node {actor_name}"),
+            server_url: format!("http://localhost:{port}"),
             port,
             actor_name: actor_name.to_string(),
             private_key_path: None,
@@ -99,7 +95,7 @@ mod test_harness {
             })
             .bind(("127.0.0.1", port))
             .unwrap_or_else(|e| {
-                eprintln!("Failed to bind to port {}: {}", port, e);
+                eprintln!("Failed to bind to port {port}: {e}");
                 std::process::exit(1);
             })
             .run()
@@ -170,7 +166,7 @@ async fn test_alice_actor_profile() {
 
     let response = context
         .client
-        .get(&format!(
+        .get(format!(
             "{}/users/{}",
             context.node_urls[0], context.actor_names[0]
         ))
@@ -209,7 +205,7 @@ async fn test_bob_actor_profile() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!(
+        .get(format!(
             "{}/users/{}",
             context.node_urls[1], context.actor_names[1]
         ))
@@ -243,7 +239,7 @@ async fn test_webfinger_discovery() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!(
+        .get(format!(
             "{}/.well-known/webfinger?resource=acct:{}@localhost:{}",
             context.node_urls[0], context.actor_names[0], context.base_port
         ))
@@ -303,7 +299,7 @@ async fn test_message_delivery_between_nodes() {
     });
     let response = context
         .client
-        .post(&format!(
+        .post(format!(
             "{}/users/{}/inbox",
             context.node_urls[1], context.actor_names[1]
         ))
@@ -325,7 +321,7 @@ async fn test_cross_node_actor_discovery() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!(
+        .get(format!(
             "{}/users/{}",
             context.node_urls[1], context.actor_names[1]
         ))
@@ -373,7 +369,7 @@ async fn test_inbox_endpoint_accepts_activities() {
     });
     let response = context
         .client
-        .post(&format!(
+        .post(format!(
             "{}/users/{}/inbox",
             context.node_urls[1], context.actor_names[1]
         ))
@@ -395,7 +391,7 @@ async fn test_outbox_endpoint_returns_collection() {
     context.wait_for_nodes().await;
     let response = context
         .client
-        .get(&format!(
+        .get(format!(
             "{}/users/{}/outbox",
             context.node_urls[0], context.actor_names[0]
         ))

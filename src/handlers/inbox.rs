@@ -130,7 +130,7 @@ pub async fn inbox(
                                         .filter_map(|v| v.as_str().map(|s| s.to_string()))
                                         .collect()
                                 })
-                                .unwrap_or_else(Vec::new);
+                                .unwrap_or_default();
                             let activity_cc = activity
                                 .get("cc")
                                 .and_then(|v| v.as_array())
@@ -139,7 +139,7 @@ pub async fn inbox(
                                         .filter_map(|v| v.as_str().map(|s| s.to_string()))
                                         .collect()
                                 })
-                                .unwrap_or_else(Vec::new);
+                                .unwrap_or_default();
 
                             let db_activity = crate::database::DbActivity {
                                 id: activity_id,

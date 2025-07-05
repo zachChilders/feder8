@@ -1,12 +1,11 @@
-use actix_web::{test, web, App, HttpResponse};
+use actix_web::{test, web, App};
 use chrono::Utc;
 use feder8::config::Config;
-use feder8::database::{DatabaseRef, DbActivity, DbActor, DbNote, MockDatabase};
+use feder8::database::{DatabaseRef, DbActivity, DbActor, MockDatabase};
 use feder8::handlers;
 use mockall::predicate::*;
 use serde_json::json;
 use std::sync::Arc;
-use uuid::Uuid;
 
 // Helper function to create a test app with mock database
 fn create_test_app(

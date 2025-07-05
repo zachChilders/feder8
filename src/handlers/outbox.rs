@@ -137,9 +137,9 @@ pub async fn post_outbox(
                             let content = object
                                 .get("content")
                                 .and_then(|v| v.as_str())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string();
-                            let to_recipients = activity
+                            let to_recipients: Vec<String> = activity
                                 .get("to")
                                 .and_then(|v| v.as_array())
                                 .map(|arr| {
@@ -147,8 +147,8 @@ pub async fn post_outbox(
                                         .filter_map(|v| v.as_str().map(|s| s.to_string()))
                                         .collect()
                                 })
-                                .unwrap_or_else(Vec::new);
-                            let cc_recipients = activity
+                                .unwrap_or_default();
+                            let cc_recipients: Vec<String> = activity
                                 .get("cc")
                                 .and_then(|v| v.as_array())
                                 .map(|arr| {
@@ -156,7 +156,7 @@ pub async fn post_outbox(
                                         .filter_map(|v| v.as_str().map(|s| s.to_string()))
                                         .collect()
                                 })
-                                .unwrap_or_else(Vec::new);
+                                .unwrap_or_default();
 
                             // Create the note in database
                             let db_note = crate::database::DbNote {

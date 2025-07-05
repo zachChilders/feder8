@@ -1,4 +1,5 @@
-use crate::models::OrderedCollection;
+#![allow(dead_code)]
+
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use mockall::automock;
@@ -639,11 +640,6 @@ impl Database for SqliteDatabase {
     }
 }
 
-// Helper function to create a mock database for testing
-pub fn create_mock_database() -> MockDatabase {
-    MockDatabase::new()
-}
-
 // Helper function to create a pre-configured mock database with common expectations
 pub fn create_configured_mock_database() -> MockDatabase {
     let mut mock = MockDatabase::new();
@@ -652,9 +648,9 @@ pub fn create_configured_mock_database() -> MockDatabase {
     mock.expect_get_actor_by_username()
         .returning(|username| {
             Ok(Some(DbActor {
-                id: format!("https://example.com/users/{}", username),
+                id: format!("https://example.com/users/{username}"),
                 username: username.to_string(),
-                name: format!("Test User {}", username),
+                name: format!("Test User {username}"),
                 summary: Some("A test user".to_string()),
                 public_key_pem: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----".to_string(),
                 private_key_pem: Some("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----".to_string()),
