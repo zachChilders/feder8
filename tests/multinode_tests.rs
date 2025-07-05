@@ -1,5 +1,9 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use feder8::{config::Config, handlers, database::{create_configured_mock_database, DatabaseRef}};
+use feder8::{
+    config::Config,
+    database::{create_configured_mock_database, DatabaseRef},
+    handlers,
+};
 use rand::Rng;
 use reqwest::Client;
 use serde_json::json;
@@ -86,7 +90,7 @@ mod test_harness {
         let server_handle = tokio::spawn(async move {
             // Initialize database (using mock for tests)
             let db: DatabaseRef = Arc::new(create_configured_mock_database());
-            
+
             let _ = HttpServer::new(move || {
                 App::new()
                     .wrap(Logger::default())

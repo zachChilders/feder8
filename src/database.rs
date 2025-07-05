@@ -670,20 +670,15 @@ pub fn create_configured_mock_database() -> MockDatabase {
         .returning(|_, _, _| Ok(vec![]));
 
     // Add expectations for inbox handler operations
-    mock.expect_get_note_by_id()
-        .returning(|_| Ok(None)); // Note doesn't exist, so create it
+    mock.expect_get_note_by_id().returning(|_| Ok(None)); // Note doesn't exist, so create it
 
-    mock.expect_create_note()
-        .returning(|_| Ok(())); // Successfully create note
+    mock.expect_create_note().returning(|_| Ok(())); // Successfully create note
 
-    mock.expect_create_activity()
-        .returning(|_| Ok(())); // Successfully create activity
+    mock.expect_create_activity().returning(|_| Ok(())); // Successfully create activity
 
-    mock.expect_create_follow()
-        .returning(|_| Ok(())); // Successfully create follow relationship
+    mock.expect_create_follow().returning(|_| Ok(())); // Successfully create follow relationship
 
-    mock.expect_update_follow_status()
-        .returning(|_, _| Ok(())); // Successfully update follow status
+    mock.expect_update_follow_status().returning(|_, _| Ok(())); // Successfully update follow status
 
     mock
 }
