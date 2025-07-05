@@ -1,187 +1,244 @@
-# Feder8 ESP32 Firmware
+# ESP32 ActivityPub Node Firmware
 
-This is an ESP-IDF Rust hello world project that demonstrates basic ESP32 functionality with LED blinking and serial output.
+This firmware implements a complete ActivityPub node that runs on ESP32 microcontrollers. It features a dependency injection architecture that allows swapping implementations for different embedded environments.
 
 ## Features
 
-- **LED Blinking**: Toggles the onboard LED (GPIO2) every second
-- **Serial Output**: Prints hello messages and LED status to the console
-- **QEMU Simulation**: Run the firmware in emulation without physical hardware
-- **Wokwi Integration**: Visual simulation with web-based interface
+- **Full ActivityPub Protocol Support**: Implements core ActivityPub activities (Create, Follow, Accept, etc.)
+- **Embedded-Optimized**: Uses heapless data structures and memory-constrained designs
+- **Dependency Injection**: Pluggable HTTP clients and delivery services
+- **WiFi Management**: Automatic connection and reconnection handling
+- **LED Status Indicators**: Visual feedback for connection and activity status
+- **Async/Await Support**: Modern async Rust for network operations
 
-## Prerequisites
+## Architecture
 
-Before building and running the firmware, you need to install the ESP-IDF development environment:
+The firmware is built with a clean architecture using dependency injection:
 
-```bash
-# Install ESP-IDF (if not already installed)
-curl -LO https://github.com/espressif/esp-idf/archive/refs/tags/v5.1.2.zip
-unzip v5.1.2.zip
-cd esp-idf-5.1.2
-./install.sh
-source export.sh
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Main Application                          │
+│                     (ActivityPubNode)                           │
+└─────────────────────────┬───────────────────────────────────────┘
+                         │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                  Dependency Container                            │
+│                 (EmbeddedContainer)                              │
+└─────────────┬─────────────────────┬─────────────────────────────┘
+             │                     │
+┌────────────▼─────────────┐ ┌──────▼──────────────────────────────┐
+│    HTTP Client Trait     │ │      Delivery Service Trait        │
+│   (EspHttpClient)        │ │   (EmbeddedDeliveryService)         │
+└──────────────────────────┘ └─────────────────────────────────────┘
 ```
 
-## Building the Firmware
+### Key Components
 
-From the root directory of the project:
+1. **Models** (`src/models.rs`):
+   - `Actor`: ActivityPub actor representation
+   - `Activity`: ActivityPub activity objects
+   - `EmbeddedConfig`: Configuration for embedded systems
+
+2. **HTTP Client** (`src/http.rs`):
+   - `HttpClient` trait for pluggable HTTP implementations
+   - `EspHttpClient` for ESP-IDF HTTP client
+   - Memory-constrained request/response handling
+
+3. **Delivery Service** (`src/delivery.rs`):
+   - `DeliveryService` trait for pluggable delivery implementations
+   - `EmbeddedDeliveryService` for ActivityPub message delivery
+   - `MockDeliveryService` for testing
+
+4. **Container** (`src/container.rs`):
+   - `EmbeddedContainer` for dependency injection
+   - `EmbeddedContainerBuilder` for flexible configuration
+   - Follower and public inbox management
+
+5. **WiFi Management** (`src/wifi.rs`):
+   - `WiFiManager` for connection handling
+   - `WiFiMonitor` for auto-reconnection
+   - `WiFiStatus` for status monitoring
+
+## Configuration
+
+Update the configuration constants in `src/main.rs`:
+
+```rust
+const WIFI_SSID: &str = "YourWiFiNetwork";
+const WIFI_PASSWORD: &str = "YourWiFiPassword";
+const SERVER_NAME: &str = "ESP32 ActivityPub Node";
+const SERVER_URL: &str = "https://esp32.local";
+const ACTOR_NAME: &str = "esp32bot";
+```
+
+## Memory Constraints
+
+The firmware is designed for embedded systems with limited memory:
+
+- **Follower List**: Maximum 32 followers
+- **Public Inboxes**: Maximum 8 public relay inboxes
+- **HTTP Requests**: Limited to 4KB body size
+- **HTTP Responses**: Limited to 8KB body size
+- **String Fields**: Various limits (64-512 characters) based on usage
+
+## Building and Flashing
+
+### Prerequisites
+
+1. Install Rust with ESP32 support:
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   rustup install nightly
+   rustup component add rust-src --toolchain nightly
+   ```
+
+2. Install ESP-IDF:
+   ```bash
+   git clone -b v4.4.2 --recursive https://github.com/espressif/esp-idf.git
+   cd esp-idf
+   ./install.sh
+   . export.sh
+   ```
+
+3. Install cargo-espflash:
+   ```bash
+   cargo install cargo-espflash
+   ```
+
+### Building
 
 ```bash
-# Build the firmware
-cargo firmware-build
-
-# Or build directly in the firmware directory
 cd src/firmware
 cargo build --release
 ```
 
-## Running in Simulation
-
-### Option 1: Using Wokwi (Recommended)
-
-Wokwi provides a visual simulation with a web interface:
+### Flashing
 
 ```bash
-# Run with Wokwi simulation
-cargo firmware-sim
-
-# Or run directly
-cd src/firmware
-./qemu_simple.sh
+cargo espflash flash --release --monitor
 ```
 
-This will:
-1. Build the firmware
-2. Start a Wokwi simulation server
-3. Open http://localhost:9012 in your browser
-4. Show a virtual ESP32 board with LED visualization
+## Usage
 
-### Option 2: Using QEMU
+Once flashed and connected to WiFi, the ESP32 will:
 
-For command-line QEMU simulation:
+1. **Connect to WiFi**: Uses configured SSID/password
+2. **Initialize ActivityPub Node**: Creates actor and sets up services
+3. **LED Status Indicators**:
+   - Solid ON: Connected and active
+   - Blinking: No WiFi connection
+4. **Send Periodic Messages**: Posts a message every 60 seconds
+5. **Log Activity**: Outputs status to serial monitor
 
-```bash
-# Run with QEMU simulation
-cd src/firmware
-./qemu_esp32.sh
+## API
 
-# Or use the sim runner with qemu flag
-cargo run --bin run-sim qemu
+### Adding Followers
+
+```rust
+// Add a follower's inbox URL
+node.add_follower("https://mastodon.social/users/alice/inbox")?;
 ```
 
-## Project Structure
+### Sending Follow Requests
 
-```
-src/firmware/
-├── Cargo.toml              # Firmware project dependencies
-├── build.rs                # Build script for ESP-IDF
-├── sdkconfig.defaults      # ESP-IDF configuration
-├── README.md              # This file
-├── qemu_esp32.sh          # QEMU simulation script
-├── qemu_simple.sh         # Wokwi simulation script
-└── src/
-    ├── main.rs            # Main firmware application
-    └── sim_runner.rs      # Simulation runner binary
+```rust
+// Send a follow request to another actor
+node.send_follow_request("https://mastodon.social/users/bob").await?;
 ```
 
-## Understanding the Code
+### Adding Public Relays
 
-The main firmware application (`src/main.rs`) demonstrates:
+```rust
+// Add a public relay for broader distribution
+node.add_public_relay("https://relay.fediverse.org/inbox")?;
+```
 
-1. **GPIO Control**: Configures GPIO2 as an output pin for LED control
-2. **FreeRTOS Integration**: Uses FreeRTOS delays for timing
-3. **Logging**: Implements both `println!` and `log::info!` for output
-4. **Infinite Loop**: Runs continuously, typical for embedded applications
+### Sending Notes
 
-## Customization
+```rust
+// Send a note to all followers
+node.send_note("Hello from ESP32!").await?;
+```
 
-To modify the firmware:
+## Dependency Injection Examples
 
-1. **Change LED Pin**: Edit the GPIO pin number in `src/main.rs`
-2. **Adjust Timing**: Modify the delay values in the main loop
-3. **Add Features**: Include additional ESP-IDF components in `Cargo.toml`
-4. **Configuration**: Update `sdkconfig.defaults` for ESP-IDF settings
+### Custom HTTP Client
 
-## Troubleshooting
+```rust
+use std::sync::Arc;
 
-### Build Issues
+// Create a custom HTTP client
+let custom_client: Arc<dyn HttpClient> = Arc::new(MyCustomHttpClient::new());
 
-If you encounter build errors:
+// Use it in the container
+let container = EmbeddedContainerBuilder::new()
+    .with_config(config)
+    .with_http_client(custom_client)
+    .build()?;
+```
 
-1. Ensure ESP-IDF is properly installed and sourced
-2. Check that the ESP-IDF version matches the project requirements
-3. Verify all dependencies are installed
+### Mock Services for Testing
 
-### Simulation Issues
+```rust
+// Create container with mock services
+let container = EmbeddedContainerBuilder::new()
+    .with_config(config)
+    .with_mocks()
+    .build()?;
+```
 
-If simulation doesn't work:
+### Custom Delivery Service
 
-1. For Wokwi: Check that the server starts and port 9012 is available
-2. For QEMU: Ensure `qemu-system-xtensa` is installed
-3. Check that the firmware binary was built successfully
+```rust
+use std::sync::Arc;
 
-### Performance
+// Create a custom delivery service
+let custom_delivery: Arc<dyn DeliveryService> = Arc::new(MyCustomDeliveryService::new());
 
-The firmware is configured for optimal size (`opt-level = "s"`) to fit within ESP32 memory constraints. You can adjust optimization levels in `Cargo.toml` if needed.
+// Use it in the container
+let container = EmbeddedContainerBuilder::new()
+    .with_config(config)
+    .with_delivery_service(custom_delivery)
+    .build()?;
+```
 
 ## Testing
 
-The firmware project includes comprehensive tests to ensure functionality and prevent regressions:
-
-### Running Tests
+Run tests with:
 
 ```bash
-cd src/firmware
-
-# Run all tests
-./run_tests.sh
-
-# Or run the test runner directly
-./test_runner
+cargo test
 ```
 
-### Test Coverage
+Note: Some tests require mocking of ESP-IDF components and may not run on host systems.
 
-The test suite includes:
+## Limitations
 
-1. **Project Structure Test**: Validates all required files exist
-2. **Script Permissions Test**: Ensures all scripts are executable
-3. **Cargo.toml Structure Test**: Validates project configuration
-4. **Source Code Syntax Test**: Basic syntax validation
-5. **QEMU Simulation Test**: Validates firmware simulation output
+- **No HTTP Server**: Currently only sends ActivityPub messages (no inbox for receiving)
+- **No Cryptographic Signatures**: HTTP signatures not yet implemented
+- **No WebFinger**: Actor discovery is simplified
+- **No Database**: All data is stored in memory
+- **No Media Attachments**: Only text notes supported
 
-### Continuous Integration
+## Future Enhancements
 
-The firmware tests are automatically run in CI/CD pipelines:
+1. **HTTP Server**: Add inbox endpoint for receiving ActivityPub messages
+2. **Cryptographic Signatures**: Implement HTTP signatures for security
+3. **WebFinger Support**: Add proper actor discovery
+4. **Persistent Storage**: Use ESP32's flash for data persistence
+5. **Media Support**: Add support for images and other media types
+6. **Better Error Handling**: More robust error recovery and logging
 
-- Tests run on every push to main/develop branches
-- Tests validate project structure and simulation functionality
-- No ESP-IDF installation required for basic testing
+## Contributing
 
-### Manual Testing
+When adding new features:
 
-For development and debugging:
+1. **Follow the dependency injection pattern**
+2. **Respect memory constraints**
+3. **Add comprehensive tests**
+4. **Update documentation**
+5. **Consider embedded limitations**
 
-```bash
-# Test individual components
-./qemu_test.sh        # Test QEMU simulation
-./test_setup.sh       # Validate project setup
-```
+## License
 
-## Integration with Main Project
-
-The firmware is integrated into the main Feder8 project as a workspace member. You can use these commands from the root directory:
-
-- `cargo firmware-build` - Build the firmware
-- `cargo firmware-sim` - Run the simulation
-- `cargo firmware-qemu` - Run the firmware binary directly
-
-## Next Steps
-
-This hello world project provides a foundation for more complex ESP32 applications. You can extend it with:
-
-- WiFi connectivity
-- Bluetooth communication
-- Sensor integration
-- Web server functionality
-- Over-the-air updates
+This project is part of the feder8 ActivityPub implementation and follows the same license terms.
