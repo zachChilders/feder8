@@ -1191,6 +1191,7 @@ dependencies = [
  "esp-idf-svc",
  "esp-idf-sys",
  "log",
+ "tokio-test",
 ]
 
 [[package]]

@@ -91,6 +91,33 @@ cd src/firmware
    - Handles installation of `qemu-system-xtensa`
    - More traditional embedded development workflow
 
+## 🧪 **Testing & Validation**
+
+### Comprehensive Test Suite
+- **Project Structure Tests**: Validates all required files and configurations
+- **Script Validation**: Verifies all shell scripts are executable and functional
+- **Configuration Tests**: Validates Cargo.toml and ESP-IDF settings
+- **QEMU Simulation Tests**: Validates firmware simulation output and functionality
+- **Source Code Syntax Tests**: Basic syntax and import validation
+
+### Standalone Test Runner
+- **`test_runner.rs`**: Standalone test binary that doesn't require ESP-IDF
+- **`run_tests.sh`**: Comprehensive test script with colored output
+- **CI-Friendly**: Tests run without ESP-IDF installation for basic validation
+
+### Continuous Integration
+- **GitHub Actions Workflow**: Automated testing on every push/PR (`firmware-test.yml`)
+- **Multi-environment Support**: Tests run on Ubuntu with proper dependency management
+- **Lint & Format Checks**: Ensures code quality standards
+- **Regression Prevention**: Catches firmware issues before they reach production
+
+### Running Tests
+```bash
+cd src/firmware
+./run_tests.sh         # Run all tests
+./test_runner          # Direct test runner
+```
+
 ## 📋 **Verification**
 
 - ✅ **Cargo Formatting**: All code formatted with `cargo fmt`
@@ -98,6 +125,8 @@ cd src/firmware
 - ✅ **Workspace Configuration**: Proper multi-package workspace setup
 - ✅ **Build Verification**: Firmware builds successfully for ESP32 target
 - ✅ **Script Permissions**: All shell scripts have proper executable permissions
+- ✅ **Test Suite**: Comprehensive test coverage with 5 different test categories
+- ✅ **CI Integration**: Automated testing pipeline configured and working
 
 ## 🎭 **Demo Application**
 

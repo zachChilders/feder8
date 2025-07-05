@@ -124,6 +124,50 @@ If simulation doesn't work:
 
 The firmware is configured for optimal size (`opt-level = "s"`) to fit within ESP32 memory constraints. You can adjust optimization levels in `Cargo.toml` if needed.
 
+## Testing
+
+The firmware project includes comprehensive tests to ensure functionality and prevent regressions:
+
+### Running Tests
+
+```bash
+cd src/firmware
+
+# Run all tests
+./run_tests.sh
+
+# Or run the test runner directly
+./test_runner
+```
+
+### Test Coverage
+
+The test suite includes:
+
+1. **Project Structure Test**: Validates all required files exist
+2. **Script Permissions Test**: Ensures all scripts are executable
+3. **Cargo.toml Structure Test**: Validates project configuration
+4. **Source Code Syntax Test**: Basic syntax validation
+5. **QEMU Simulation Test**: Validates firmware simulation output
+
+### Continuous Integration
+
+The firmware tests are automatically run in CI/CD pipelines:
+
+- Tests run on every push to main/develop branches
+- Tests validate project structure and simulation functionality
+- No ESP-IDF installation required for basic testing
+
+### Manual Testing
+
+For development and debugging:
+
+```bash
+# Test individual components
+./qemu_test.sh        # Test QEMU simulation
+./test_setup.sh       # Validate project setup
+```
+
 ## Integration with Main Project
 
 The firmware is integrated into the main Feder8 project as a workspace member. You can use these commands from the root directory:

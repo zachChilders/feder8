@@ -11,6 +11,14 @@ path = "src/main.rs"
 name = "run-sim"
 path = "src/sim_runner.rs"
 
+[[bin]]
+name = "test-runner"
+path = "test_runner.rs"
+
+# Test configuration
+[dev-dependencies]
+tokio-test = "0.4"
+
 [dependencies]
 esp-idf-sys = { version = "0.33", features = ["binstart"] }
 esp-idf-hal = "0.42"
@@ -21,3 +29,7 @@ anyhow = "1.0"
 
 [build-dependencies]
 embuild = "0.31"
+
+# Create a separate test-only package to avoid ESP-IDF dependencies during testing
+[package.metadata.docs.rs]
+default-target = "x86_64-unknown-linux-gnu"
