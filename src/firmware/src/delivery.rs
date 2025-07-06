@@ -25,7 +25,7 @@ impl EmbeddedDeliveryService {
 
         // Convert activity to JSON
         let activity_json = serde_json::to_value(activity)?;
-        
+
         // Prepare headers
         let mut headers = HashMap::new();
         headers.insert(
@@ -68,7 +68,10 @@ impl EmbeddedDeliveryService {
         info!("Delivering activity to {} followers", followers.len());
 
         for follower_inbox in followers {
-            if let Err(e) = self.deliver_activity(follower_inbox.as_str(), activity).await {
+            if let Err(e) = self
+                .deliver_activity(follower_inbox.as_str(), activity)
+                .await
+            {
                 warn!("Failed to deliver to {}: {}", follower_inbox.as_str(), e);
                 // Continue with other deliveries even if one fails
             }
@@ -90,7 +93,11 @@ impl EmbeddedDeliveryService {
 
         for inbox in public_inboxes {
             if let Err(e) = self.deliver_activity(inbox.as_str(), activity).await {
-                warn!("Failed to deliver to public inbox {}: {}", inbox.as_str(), e);
+                warn!(
+                    "Failed to deliver to public inbox {}: {}",
+                    inbox.as_str(),
+                    e
+                );
                 // Continue with other deliveries even if one fails
             }
         }
@@ -105,14 +112,15 @@ impl EmbeddedDeliveryService {
         followers: &HeaplessVec<HeaplessString<128>, 32>,
     ) -> Result<()> {
         // Create actor ID from config
-        let actor_id = format!("{}/users/{}", self.config.server_url.as_str(), self.config.actor_name.as_str());
+        let actor_id = format!(
+            "{}/users/{}",
+            self.config.server_url.as_str(),
+            self.config.actor_name.as_str()
+        );
 
         // Create note activity
-        let activity = Activity::new_create_note(
-            &actor_id,
-            note_content,
-            self.config.server_url.as_str(),
-        )?;
+        let activity =
+            Activity::new_create_note(&actor_id, note_content, self.config.server_url.as_str())?;
 
         // Deliver to followers
         self.deliver_to_followers(&activity, followers).await?;
@@ -125,14 +133,15 @@ impl EmbeddedDeliveryService {
         info!("Sending follow request to {}", target_actor_id);
 
         // Create actor ID from config
-        let actor_id = format!("{}/users/{}", self.config.server_url.as_str(), self.config.actor_name.as_str());
+        let actor_id = format!(
+            "{}/users/{}",
+            self.config.server_url.as_str(),
+            self.config.actor_name.as_str()
+        );
 
         // Create follow activity
-        let activity = Activity::new_follow(
-            &actor_id,
-            target_actor_id,
-            self.config.server_url.as_str(),
-        )?;
+        let activity =
+            Activity::new_follow(&actor_id, target_actor_id, self.config.server_url.as_str())?;
 
         // Extract inbox URL from target actor (simplified - in real implementation would need WebFinger)
         let inbox_url = format!("{}/inbox", target_actor_id);
@@ -145,10 +154,17 @@ impl EmbeddedDeliveryService {
 
     /// Accept a follow request
     pub async fn accept_follow_request(&self, original_follow: Activity) -> Result<()> {
-        info!("Accepting follow request from {}", original_follow.actor.as_str());
+        info!(
+            "Accepting follow request from {}",
+            original_follow.actor.as_str()
+        );
 
         // Create actor ID from config
-        let actor_id = format!("{}/users/{}", self.config.server_url.as_str(), self.config.actor_name.as_str());
+        let actor_id = format!(
+            "{}/users/{}",
+            self.config.server_url.as_str(),
+            self.config.actor_name.as_str()
+        );
 
         // Create accept activity
         let accept_activity = Activity::new_accept_follow(
@@ -245,14 +261,16 @@ impl MockDeliveryService {
     }
 
     pub fn get_delivery_count(&self) -> usize {
-        self.delivery_count.load(std::sync::atomic::Ordering::Relaxed)
+        self.delivery_count
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
 impl DeliveryService for MockDeliveryService {
     async fn deliver_activity(&self, inbox_url: &str, _activity: &Activity) -> Result<()> {
         info!("Mock delivery to {}", inbox_url);
-        self.delivery_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.delivery_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 
@@ -262,7 +280,8 @@ impl DeliveryService for MockDeliveryService {
         followers: &HeaplessVec<HeaplessString<128>, 32>,
     ) -> Result<()> {
         info!("Mock delivery to {} followers", followers.len());
-        self.delivery_count.fetch_add(followers.len(), std::sync::atomic::Ordering::Relaxed);
+        self.delivery_count
+            .fetch_add(followers.len(), std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 
@@ -272,7 +291,8 @@ impl DeliveryService for MockDeliveryService {
         public_inboxes: &HeaplessVec<HeaplessString<128>, 8>,
     ) -> Result<()> {
         info!("Mock delivery to {} public inboxes", public_inboxes.len());
-        self.delivery_count.fetch_add(public_inboxes.len(), std::sync::atomic::Ordering::Relaxed);
+        self.delivery_count
+            .fetch_add(public_inboxes.len(), std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 }
@@ -323,7 +343,8 @@ mod tests {
             "testuser",
             "TestWiFi",
             "password123",
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     #[test]
@@ -353,7 +374,8 @@ mod tests {
             "https://esp32.local/users/testuser",
             "Hello, world!",
             "https://esp32.local",
-        ).unwrap();
+        )
+        .unwrap();
 
         let followers = HeaplessVec::new();
         let result = service.deliver_to_followers(&activity, &followers).await;
@@ -370,7 +392,8 @@ mod tests {
             "https://esp32.local/users/testuser",
             "Hello, world!",
             "https://esp32.local",
-        ).unwrap();
+        )
+        .unwrap();
 
         let public_inboxes = HeaplessVec::new();
         let result = service.deliver_to_public(&activity, &public_inboxes).await;
@@ -391,15 +414,18 @@ mod tests {
     #[tokio::test]
     async fn test_mock_delivery_service_trait() {
         let mock_service = MockDeliveryService::new();
-        
+
         let activity = Activity::new_create_note(
             "https://esp32.local/users/testuser",
             "Hello, world!",
             "https://esp32.local",
-        ).unwrap();
+        )
+        .unwrap();
 
         let followers = HeaplessVec::new();
-        let result = mock_service.deliver_to_followers(&activity, &followers).await;
+        let result = mock_service
+            .deliver_to_followers(&activity, &followers)
+            .await;
         assert!(result.is_ok());
     }
 }

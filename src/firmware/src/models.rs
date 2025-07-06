@@ -54,7 +54,7 @@ impl Actor {
         if name.len() > 64 || username.len() > 64 || server_url.len() > 64 {
             return Err("String too long for embedded constraints");
         }
-        
+
         if public_key_pem.len() > 512 {
             return Err("Public key too long for embedded constraints");
         }
@@ -65,8 +65,14 @@ impl Actor {
         }
 
         let mut context = HeaplessVec::new();
-        context.push(HeaplessString::from("https://www.w3.org/ns/activitystreams")).map_err(|_| "Context too long")?;
-        context.push(HeaplessString::from("https://w3id.org/security/v1")).map_err(|_| "Context too long")?;
+        context
+            .push(HeaplessString::from(
+                "https://www.w3.org/ns/activitystreams",
+            ))
+            .map_err(|_| "Context too long")?;
+        context
+            .push(HeaplessString::from("https://w3id.org/security/v1"))
+            .map_err(|_| "Context too long")?;
 
         Ok(Self {
             context,
@@ -103,7 +109,7 @@ impl Actor {
         if icon_url.len() > 128 || media_type.len() > 32 {
             return Err("Icon parameters too long for embedded constraints");
         }
-        
+
         self.icon = Some(Icon {
             icon_type: HeaplessString::from("Image"),
             url: HeaplessString::from(icon_url),
@@ -164,7 +170,11 @@ impl Activity {
         let note_id = format!("{}/notes/{}", server_url, uuid::Uuid::new_v4());
 
         let mut context = HeaplessVec::new();
-        context.push(HeaplessString::from("https://www.w3.org/ns/activitystreams")).map_err(|_| "Context too long")?;
+        context
+            .push(HeaplessString::from(
+                "https://www.w3.org/ns/activitystreams",
+            ))
+            .map_err(|_| "Context too long")?;
 
         let note = Note {
             note_type: HeaplessString::from("Note"),
@@ -200,10 +210,15 @@ impl Activity {
         let activity_id = format!("{}/activities/{}", server_url, uuid::Uuid::new_v4());
 
         let mut context = HeaplessVec::new();
-        context.push(HeaplessString::from("https://www.w3.org/ns/activitystreams")).map_err(|_| "Context too long")?;
+        context
+            .push(HeaplessString::from(
+                "https://www.w3.org/ns/activitystreams",
+            ))
+            .map_err(|_| "Context too long")?;
 
         let mut to = HeaplessVec::new();
-        to.push(HeaplessString::from(target_actor_id)).map_err(|_| "To field too long")?;
+        to.push(HeaplessString::from(target_actor_id))
+            .map_err(|_| "To field too long")?;
 
         Ok(Self {
             context,
@@ -229,10 +244,15 @@ impl Activity {
         let activity_id = format!("{}/activities/{}", server_url, uuid::Uuid::new_v4());
 
         let mut context = HeaplessVec::new();
-        context.push(HeaplessString::from("https://www.w3.org/ns/activitystreams")).map_err(|_| "Context too long")?;
+        context
+            .push(HeaplessString::from(
+                "https://www.w3.org/ns/activitystreams",
+            ))
+            .map_err(|_| "Context too long")?;
 
         let mut to = HeaplessVec::new();
-        to.push(original_follow.actor.clone()).map_err(|_| "To field too long")?;
+        to.push(original_follow.actor.clone())
+            .map_err(|_| "To field too long")?;
 
         Ok(Self {
             context,
@@ -270,7 +290,7 @@ impl EmbeddedConfig {
         if server_name.len() > 64 || server_url.len() > 128 || actor_name.len() > 64 {
             return Err("Server configuration parameters too long");
         }
-        
+
         if wifi_ssid.len() > 64 || wifi_password.len() > 64 {
             return Err("WiFi configuration parameters too long");
         }
@@ -308,7 +328,8 @@ mod tests {
             "testuser",
             "https://esp32.local",
             "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(actor.name.as_str(), "Test User");
         assert_eq!(actor.preferred_username.as_str(), "testuser");
@@ -322,11 +343,15 @@ mod tests {
             "https://esp32.local/users/testuser",
             "Hello from ESP32!",
             "https://esp32.local",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(activity.activity_type.as_str(), "Create");
-        assert_eq!(activity.actor.as_str(), "https://esp32.local/users/testuser");
-        
+        assert_eq!(
+            activity.actor.as_str(),
+            "https://esp32.local/users/testuser"
+        );
+
         if let ActivityObject::Note(note) = &activity.object {
             assert_eq!(note.content.as_str(), "Hello from ESP32!");
         } else {
@@ -342,7 +367,8 @@ mod tests {
             "esp32user",
             "MyWiFi",
             "password123",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(config.server_name.as_str(), "ESP32 Node");
         assert_eq!(config.server_url.as_str(), "https://esp32.local");
@@ -353,12 +379,7 @@ mod tests {
     #[test]
     fn test_string_length_validation() {
         let long_name = "a".repeat(100);
-        let result = Actor::new(
-            &long_name,
-            "testuser",
-            "https://esp32.local",
-            "test-key",
-        );
+        let result = Actor::new(&long_name, "testuser", "https://esp32.local", "test-key");
 
         assert!(result.is_err());
     }
@@ -369,10 +390,11 @@ mod tests {
             "https://esp32.local/users/esp32user",
             "https://mastodon.social/users/alice",
             "https://esp32.local",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(activity.activity_type.as_str(), "Follow");
-        
+
         if let ActivityObject::Follow(target) = &activity.object {
             assert_eq!(target.as_str(), "https://mastodon.social/users/alice");
         } else {

@@ -1,4 +1,6 @@
-use crate::delivery::{DeliveryService, EmbeddedDeliveryService, MockDeliveryService, DeliveryServiceExt};
+use crate::delivery::{
+    DeliveryService, DeliveryServiceExt, EmbeddedDeliveryService, MockDeliveryService,
+};
 use crate::http::{EspHttpClient, HttpClient};
 use crate::models::{Actor, EmbeddedConfig};
 use anyhow::Result;
@@ -20,7 +22,9 @@ impl EmbeddedContainer {
     /// Create a new container with default implementations
     pub fn new(config: EmbeddedConfig) -> Result<Self> {
         // Create actor from config
-        let public_key = config.public_key_pem.as_ref()
+        let public_key = config
+            .public_key_pem
+            .as_ref()
             .map(|key| key.as_str())
             .unwrap_or("-----BEGIN PUBLIC KEY-----\ntemp-key\n-----END PUBLIC KEY-----");
 
@@ -29,13 +33,17 @@ impl EmbeddedContainer {
             config.actor_name.as_str(),
             config.server_url.as_str(),
             public_key,
-        ).map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
 
         // Create HTTP client
         let http_client: Arc<dyn HttpClient> = Arc::new(EspHttpClient::new()?);
 
         // Create delivery service
-        let delivery_service = Arc::new(EmbeddedDeliveryService::new(config.clone(), http_client.clone()));
+        let delivery_service = Arc::new(EmbeddedDeliveryService::new(
+            config.clone(),
+            http_client.clone(),
+        ));
 
         Ok(Self {
             config,
@@ -52,7 +60,9 @@ impl EmbeddedContainer {
         config: EmbeddedConfig,
         http_client: Arc<dyn HttpClient>,
     ) -> Result<Self> {
-        let public_key = config.public_key_pem.as_ref()
+        let public_key = config
+            .public_key_pem
+            .as_ref()
             .map(|key| key.as_str())
             .unwrap_or("-----BEGIN PUBLIC KEY-----\ntemp-key\n-----END PUBLIC KEY-----");
 
@@ -61,9 +71,13 @@ impl EmbeddedContainer {
             config.actor_name.as_str(),
             config.server_url.as_str(),
             public_key,
-        ).map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
 
-        let delivery_service = Arc::new(EmbeddedDeliveryService::new(config.clone(), http_client.clone()));
+        let delivery_service = Arc::new(EmbeddedDeliveryService::new(
+            config.clone(),
+            http_client.clone(),
+        ));
 
         Ok(Self {
             config,
@@ -80,7 +94,9 @@ impl EmbeddedContainer {
         config: EmbeddedConfig,
         delivery_service: Arc<dyn DeliveryService>,
     ) -> Result<Self> {
-        let public_key = config.public_key_pem.as_ref()
+        let public_key = config
+            .public_key_pem
+            .as_ref()
             .map(|key| key.as_str())
             .unwrap_or("-----BEGIN PUBLIC KEY-----\ntemp-key\n-----END PUBLIC KEY-----");
 
@@ -89,7 +105,8 @@ impl EmbeddedContainer {
             config.actor_name.as_str(),
             config.server_url.as_str(),
             public_key,
-        ).map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
 
         let http_client: Arc<dyn HttpClient> = Arc::new(EspHttpClient::new()?);
 
@@ -105,7 +122,9 @@ impl EmbeddedContainer {
 
     /// Create a container with mock services for testing
     pub fn with_mocks(config: EmbeddedConfig) -> Result<Self> {
-        let public_key = config.public_key_pem.as_ref()
+        let public_key = config
+            .public_key_pem
+            .as_ref()
             .map(|key| key.as_str())
             .unwrap_or("-----BEGIN PUBLIC KEY-----\ntest-key\n-----END PUBLIC KEY-----");
 
@@ -114,7 +133,8 @@ impl EmbeddedContainer {
             config.actor_name.as_str(),
             config.server_url.as_str(),
             public_key,
-        ).map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create actor: {}", e))?;
 
         let http_client: Arc<dyn HttpClient> = Arc::new(EspHttpClient::new()?);
         let delivery_service: Arc<dyn DeliveryService> = Arc::new(MockDeliveryService::new());
@@ -162,10 +182,13 @@ impl EmbeddedContainer {
     /// Add a follower inbox
     pub fn add_follower(&mut self, inbox_url: &str) -> Result<()> {
         if inbox_url.len() > 128 {
-            return Err(anyhow::anyhow!("Inbox URL too long for embedded constraints"));
+            return Err(anyhow::anyhow!(
+                "Inbox URL too long for embedded constraints"
+            ));
         }
 
-        self.followers.push(HeaplessString::from(inbox_url))
+        self.followers
+            .push(HeaplessString::from(inbox_url))
             .map_err(|_| anyhow::anyhow!("Followers list is full"))?;
 
         Ok(())
@@ -173,16 +196,20 @@ impl EmbeddedContainer {
 
     /// Remove a follower inbox
     pub fn remove_follower(&mut self, inbox_url: &str) {
-        self.followers.retain(|follower| follower.as_str() != inbox_url);
+        self.followers
+            .retain(|follower| follower.as_str() != inbox_url);
     }
 
     /// Add a public inbox
     pub fn add_public_inbox(&mut self, inbox_url: &str) -> Result<()> {
         if inbox_url.len() > 128 {
-            return Err(anyhow::anyhow!("Inbox URL too long for embedded constraints"));
+            return Err(anyhow::anyhow!(
+                "Inbox URL too long for embedded constraints"
+            ));
         }
 
-        self.public_inboxes.push(HeaplessString::from(inbox_url))
+        self.public_inboxes
+            .push(HeaplessString::from(inbox_url))
             .map_err(|_| anyhow::anyhow!("Public inboxes list is full"))?;
 
         Ok(())
@@ -190,42 +217,61 @@ impl EmbeddedContainer {
 
     /// Remove a public inbox
     pub fn remove_public_inbox(&mut self, inbox_url: &str) {
-        self.public_inboxes.retain(|inbox| inbox.as_str() != inbox_url);
+        self.public_inboxes
+            .retain(|inbox| inbox.as_str() != inbox_url);
     }
 
     /// Send a note to followers
     pub async fn send_note(&self, content: &str) -> Result<()> {
-        let actor_id = format!("{}/users/{}", self.config.server_url.as_str(), self.config.actor_name.as_str());
+        let actor_id = format!(
+            "{}/users/{}",
+            self.config.server_url.as_str(),
+            self.config.actor_name.as_str()
+        );
         deliver_note_helper(
             &self.delivery_service,
             content,
             &self.followers,
             &actor_id,
             self.config.server_url.as_str(),
-        ).await
+        )
+        .await
     }
 
     /// Send a follow request (simplified version)
     pub async fn send_follow_request(&self, target_actor_id: &str) -> Result<()> {
         // Create a simplified follow activity
-        let actor_id = format!("{}/users/{}", self.config.server_url.as_str(), self.config.actor_name.as_str());
+        let actor_id = format!(
+            "{}/users/{}",
+            self.config.server_url.as_str(),
+            self.config.actor_name.as_str()
+        );
         let activity = crate::models::Activity::new_follow(
             &actor_id,
             target_actor_id,
             self.config.server_url.as_str(),
         )?;
-        
+
         // Extract inbox URL from target actor (simplified)
         let inbox_url = format!("{}/inbox", target_actor_id);
-        
+
         // Deliver follow request
-        self.delivery_service.deliver_activity(&inbox_url, &activity).await
+        self.delivery_service
+            .deliver_activity(&inbox_url, &activity)
+            .await
     }
 
     /// Accept a follow request (simplified version)
-    pub async fn accept_follow_request(&self, original_follow: crate::models::Activity) -> Result<()> {
+    pub async fn accept_follow_request(
+        &self,
+        original_follow: crate::models::Activity,
+    ) -> Result<()> {
         // Create actor ID from config
-        let actor_id = format!("{}/users/{}", self.config.server_url.as_str(), self.config.actor_name.as_str());
+        let actor_id = format!(
+            "{}/users/{}",
+            self.config.server_url.as_str(),
+            self.config.actor_name.as_str()
+        );
 
         // Create accept activity
         let accept_activity = crate::models::Activity::new_accept_follow(
@@ -238,7 +284,9 @@ impl EmbeddedContainer {
         let inbox_url = format!("{}/inbox", original_follow.actor.as_str());
 
         // Deliver accept response
-        self.delivery_service.deliver_activity(&inbox_url, &accept_activity).await
+        self.delivery_service
+            .deliver_activity(&inbox_url, &accept_activity)
+            .await
     }
 }
 
@@ -281,7 +329,9 @@ impl EmbeddedContainerBuilder {
     }
 
     pub fn build(self) -> Result<EmbeddedContainer> {
-        let config = self.config.ok_or_else(|| anyhow::anyhow!("Config is required"))?;
+        let config = self
+            .config
+            .ok_or_else(|| anyhow::anyhow!("Config is required"))?;
 
         if self.use_mocks {
             return EmbeddedContainer::with_mocks(config);
@@ -325,13 +375,11 @@ async fn deliver_note_helper(
     server_url: &str,
 ) -> Result<()> {
     // Create a simple note activity
-    let activity = crate::models::Activity::new_create_note(
-        actor_id,
-        note_content,
-        server_url,
-    )?;
+    let activity = crate::models::Activity::new_create_note(actor_id, note_content, server_url)?;
 
-    delivery_service.deliver_to_followers(&activity, followers).await
+    delivery_service
+        .deliver_to_followers(&activity, followers)
+        .await
 }
 
 #[cfg(test)]
@@ -346,7 +394,8 @@ mod tests {
             "testuser",
             "TestWiFi",
             "password123",
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     #[test]
@@ -355,7 +404,10 @@ mod tests {
         let container = EmbeddedContainer::new(config.clone()).unwrap();
 
         assert_eq!(container.config().server_name.as_str(), "Test Node");
-        assert_eq!(container.config().server_url.as_str(), "https://esp32.local");
+        assert_eq!(
+            container.config().server_url.as_str(),
+            "https://esp32.local"
+        );
         assert_eq!(container.config().actor_name.as_str(), "testuser");
         assert_eq!(container.actor().name.as_str(), "testuser");
         assert_eq!(container.followers().len(), 0);
@@ -368,7 +420,10 @@ mod tests {
         let container = EmbeddedContainer::with_mocks(config.clone()).unwrap();
 
         assert_eq!(container.config().server_name.as_str(), "Test Node");
-        assert_eq!(container.config().server_url.as_str(), "https://esp32.local");
+        assert_eq!(
+            container.config().server_url.as_str(),
+            "https://esp32.local"
+        );
         assert_eq!(container.config().actor_name.as_str(), "testuser");
     }
 
@@ -382,7 +437,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(container.config().server_name.as_str(), "Test Node");
-        assert_eq!(container.config().server_url.as_str(), "https://esp32.local");
+        assert_eq!(
+            container.config().server_url.as_str(),
+            "https://esp32.local"
+        );
         assert_eq!(container.config().actor_name.as_str(), "testuser");
     }
 
@@ -400,7 +458,9 @@ mod tests {
         assert_eq!(container.followers().len(), 0);
 
         // Add follower
-        container.add_follower("https://mastodon.social/users/alice/inbox").unwrap();
+        container
+            .add_follower("https://mastodon.social/users/alice/inbox")
+            .unwrap();
         assert_eq!(container.followers().len(), 1);
 
         // Remove follower
@@ -416,7 +476,9 @@ mod tests {
         assert_eq!(container.public_inboxes().len(), 0);
 
         // Add public inbox
-        container.add_public_inbox("https://relay.fediverse.org/inbox").unwrap();
+        container
+            .add_public_inbox("https://relay.fediverse.org/inbox")
+            .unwrap();
         assert_eq!(container.public_inboxes().len(), 1);
 
         // Remove public inbox
@@ -433,7 +495,7 @@ mod tests {
         for i in 0..33 {
             let inbox = format!("https://example.com/users/user{}/inbox", i);
             let result = container.add_follower(&inbox);
-            
+
             if i < 32 {
                 assert!(result.is_ok());
             } else {
@@ -451,7 +513,7 @@ mod tests {
         for i in 0..9 {
             let inbox = format!("https://relay{}.example.com/inbox", i);
             let result = container.add_public_inbox(&inbox);
-            
+
             if i < 8 {
                 assert!(result.is_ok());
             } else {
@@ -466,8 +528,17 @@ mod tests {
         let container = EmbeddedContainer::new(config).unwrap();
         let cloned = container.clone();
 
-        assert_eq!(container.config().server_name.as_str(), cloned.config().server_name.as_str());
-        assert_eq!(container.config().server_url.as_str(), cloned.config().server_url.as_str());
-        assert_eq!(container.config().actor_name.as_str(), cloned.config().actor_name.as_str());
+        assert_eq!(
+            container.config().server_name.as_str(),
+            cloned.config().server_name.as_str()
+        );
+        assert_eq!(
+            container.config().server_url.as_str(),
+            cloned.config().server_url.as_str()
+        );
+        assert_eq!(
+            container.config().actor_name.as_str(),
+            cloned.config().actor_name.as_str()
+        );
     }
 }

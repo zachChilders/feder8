@@ -1,25 +1,35 @@
 use anyhow::Result;
-use esp_idf_hal::peripheral::Peripheral;
-use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
 use log::{error, info, warn};
 use std::time::Duration;
 
+#[cfg(target_arch = "xtensa")]
+use esp_idf_hal::peripheral::Peripheral;
+#[cfg(target_arch = "xtensa")]
+use esp_idf_svc::eventloop::EspSystemEventLoop;
+#[cfg(target_arch = "xtensa")]
+use esp_idf_svc::nvs::EspDefaultNvsPartition;
+#[cfg(target_arch = "xtensa")]
+use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
+
+#[cfg(target_arch = "xtensa")]
 pub struct WiFiManager {
     wifi: BlockingWifi<EspWifi<'static>>,
 }
 
+#[cfg(not(target_arch = "xtensa"))]
+pub struct WiFiManager {
+    connected: bool,
+    ssid: String,
+}
+
+#[cfg(target_arch = "xtensa")]
 impl WiFiManager {
     pub fn new(
         modem: impl Peripheral<P = esp_idf_hal::modem::Modem> + 'static,
         sysloop: EspSystemEventLoop,
         nvs: EspDefaultNvsPartition,
     ) -> Result<Self> {
-        let wifi = BlockingWifi::wrap(
-            EspWifi::new(modem, sysloop.clone(), Some(nvs))?,
-            sysloop,
-        )?;
+        let wifi = BlockingWifi::wrap(EspWifi::new(modem, sysloop.clone(), Some(nvs))?, sysloop)?;
 
         Ok(Self { wifi })
     }
@@ -67,7 +77,7 @@ impl WiFiManager {
 
     pub fn wait_for_connection(&mut self, timeout_secs: u64) -> Result<()> {
         info!("Waiting for WiFi connection (timeout: {}s)", timeout_secs);
-        
+
         let start_time = std::time::Instant::now();
         let timeout_duration = Duration::from_secs(timeout_secs);
 
@@ -86,7 +96,7 @@ impl WiFiManager {
 
     pub fn reconnect(&mut self, ssid: &str, password: &str) -> Result<()> {
         warn!("Attempting to reconnect to WiFi...");
-        
+
         if self.is_connected() {
             info!("Already connected to WiFi");
             return Ok(());
@@ -103,6 +113,55 @@ impl WiFiManager {
 
         Ok(())
     }
+}
+
+#[cfg(not(target_arch = "xtensa"))]
+impl WiFiManager {
+    pub fn new<T>(_modem: T, _sysloop: (), _nvs: ()) -> Result<Self> {
+        Ok(Self {
+            connected: false,
+            ssid: String::new(),
+        })
+    }
+
+    pub fn connect(&mut self, ssid: &str, _password: &str) -> Result<()> {
+        info!("Mock WiFi connecting to: {}", ssid);
+        self.ssid = ssid.to_string();
+        self.connected = true;
+        Ok(())
+    }
+
+    pub fn disconnect(&mut self) -> Result<()> {
+        info!("Mock WiFi disconnecting");
+        self.connected = false;
+        Ok(())
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    pub fn get_ip_info(&self) -> Result<MockIpInfo> {
+        Ok(MockIpInfo {
+            ip: "127.0.0.1".to_string(),
+        })
+    }
+
+    pub fn wait_for_connection(&mut self, _timeout_secs: u64) -> Result<()> {
+        info!("Mock WiFi connection established!");
+        self.connected = true;
+        Ok(())
+    }
+
+    pub fn reconnect(&mut self, ssid: &str, password: &str) -> Result<()> {
+        info!("Mock WiFi reconnecting");
+        self.connect(ssid, password)
+    }
+}
+
+#[cfg(not(target_arch = "xtensa"))]
+pub struct MockIpInfo {
+    pub ip: String,
 }
 
 /// WiFi monitoring and auto-reconnection functionality
@@ -130,11 +189,11 @@ impl WiFiMonitor {
 
     pub fn start_monitoring(&mut self) -> Result<()> {
         info!("Starting WiFi monitoring with auto-reconnect...");
-        
+
         loop {
             if !self.manager.is_connected() {
                 warn!("WiFi connection lost, attempting to reconnect...");
-                
+
                 if let Err(e) = self.manager.reconnect(&self.ssid, &self.password) {
                     error!("Failed to reconnect to WiFi: {}", e);
                 } else {
@@ -150,7 +209,13 @@ impl WiFiMonitor {
         self.manager.is_connected()
     }
 
+    #[cfg(target_arch = "xtensa")]
     pub fn get_ip_info(&self) -> Result<esp_idf_svc::ipv4::IpInfo> {
+        self.manager.get_ip_info()
+    }
+
+    #[cfg(not(target_arch = "xtensa"))]
+    pub fn get_ip_info(&self) -> Result<MockIpInfo> {
         self.manager.get_ip_info()
     }
 }
@@ -165,6 +230,7 @@ pub struct WiFiStatus {
 }
 
 impl WiFiStatus {
+    #[cfg(target_arch = "xtensa")]
     pub fn new(manager: &WiFiManager) -> Self {
         let connected = manager.is_connected();
         let ip_address = if connected {
@@ -181,6 +247,23 @@ impl WiFiStatus {
         }
     }
 
+    #[cfg(not(target_arch = "xtensa"))]
+    pub fn new(manager: &WiFiManager) -> Self {
+        let connected = manager.is_connected();
+        let ip_address = if connected {
+            Some("127.0.0.1".to_string())
+        } else {
+            None
+        };
+
+        Self {
+            connected,
+            ip_address,
+            rssi: Some(-45), // Mock RSSI
+            ssid: Some("MockWiFi".to_string()),
+        }
+    }
+
     pub fn is_ready_for_activitypub(&self) -> bool {
         self.connected && self.ip_address.is_some()
     }
@@ -192,8 +275,6 @@ mod tests {
 
     #[test]
     fn test_wifi_status_creation() {
-        // Note: This test can't actually create a WiFiManager without ESP-IDF hardware
-        // In a real test environment, you'd need to mock the ESP-IDF components
         let status = WiFiStatus {
             connected: true,
             ip_address: Some("192.168.1.100".to_string()),
@@ -222,7 +303,6 @@ mod tests {
     #[test]
     fn test_wifi_monitor_creation() {
         // This test just verifies the structure can be created
-        // In a real test, you'd need to mock the WiFiManager
         let ssid = "TestNetwork".to_string();
         let password = "TestPassword".to_string();
         let reconnect_interval = 30;
@@ -231,5 +311,18 @@ mod tests {
         assert_eq!(ssid, "TestNetwork");
         assert_eq!(password, "TestPassword");
         assert_eq!(reconnect_interval, 30);
+    }
+
+    #[test]
+    fn test_mock_wifi_manager() {
+        let mut manager = WiFiManager::new((), (), ()).unwrap();
+
+        assert!(!manager.is_connected());
+
+        manager.connect("TestWiFi", "password123").unwrap();
+        assert!(manager.is_connected());
+
+        manager.disconnect().unwrap();
+        assert!(!manager.is_connected());
     }
 }

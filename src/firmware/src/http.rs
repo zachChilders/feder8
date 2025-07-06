@@ -1,8 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use embedded_svc::http::client::Client;
-use esp_idf_svc::http::client::{Configuration, EspHttpConnection};
 use std::io::Read;
+
+#[cfg(target_arch = "xtensa")]
+use esp_idf_svc::http::client::{Configuration, EspHttpConnection};
 use heapless::Vec as HeaplessVec;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -44,16 +46,18 @@ impl HttpRequest {
     pub fn with_json_body(mut self, json: &Value) -> Result<Self> {
         let json_bytes = serde_json::to_vec(json)?;
         if json_bytes.len() > 4096 {
-            return Err(anyhow::anyhow!("JSON payload too large for embedded system"));
+            return Err(anyhow::anyhow!(
+                "JSON payload too large for embedded system"
+            ));
         }
-        
+
         let mut body = HeaplessVec::new();
-        body.extend_from_slice(&json_bytes).map_err(|_| {
-            anyhow::anyhow!("Failed to store JSON body in embedded buffer")
-        })?;
-        
+        body.extend_from_slice(&json_bytes)
+            .map_err(|_| anyhow::anyhow!("Failed to store JSON body in embedded buffer"))?;
+
         self.body = Some(body);
-        self.headers.insert("content-type".to_string(), "application/json".to_string());
+        self.headers
+            .insert("content-type".to_string(), "application/json".to_string());
         Ok(self)
     }
 
@@ -61,12 +65,11 @@ impl HttpRequest {
         if body_data.len() > 4096 {
             return Err(anyhow::anyhow!("Body too large for embedded system"));
         }
-        
+
         let mut body = HeaplessVec::new();
-        body.extend_from_slice(body_data).map_err(|_| {
-            anyhow::anyhow!("Failed to store body in embedded buffer")
-        })?;
-        
+        body.extend_from_slice(body_data)
+            .map_err(|_| anyhow::anyhow!("Failed to store body in embedded buffer"))?;
+
         self.body = Some(body);
         Ok(self)
     }
@@ -129,10 +132,12 @@ pub trait HttpClient: Send + Sync {
 }
 
 /// ESP-IDF HTTP client implementation
+#[cfg(target_arch = "xtensa")]
 pub struct EspHttpClient {
     config: Configuration,
 }
 
+#[cfg(target_arch = "xtensa")]
 impl EspHttpClient {
     pub fn new() -> Result<Self> {
         let config = Configuration {
@@ -155,12 +160,28 @@ impl EspHttpClient {
     }
 }
 
+/// Mock HTTP client for non-ESP32 environments
+#[cfg(not(target_arch = "xtensa"))]
+pub struct EspHttpClient;
+
+#[cfg(not(target_arch = "xtensa"))]
+impl EspHttpClient {
+    pub fn new() -> Result<Self> {
+        Ok(Self)
+    }
+
+    pub fn with_timeout(_timeout_secs: u64) -> Result<Self> {
+        Ok(Self)
+    }
+}
+
 impl Default for EspHttpClient {
     fn default() -> Self {
         Self::new().expect("Failed to create ESP HTTP client")
     }
 }
 
+#[cfg(target_arch = "xtensa")]
 #[async_trait]
 impl HttpClient for EspHttpClient {
     async fn send(&self, request: HttpRequest) -> Result<HttpResponse> {
@@ -173,7 +194,12 @@ impl HttpClient for EspHttpClient {
             "POST" => embedded_svc::http::Method::Post,
             "PUT" => embedded_svc::http::Method::Put,
             "DELETE" => embedded_svc::http::Method::Delete,
-            _ => return Err(anyhow::anyhow!("Unsupported HTTP method: {}", request.method)),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported HTTP method: {}",
+                    request.method
+                ))
+            }
         };
 
         // Build headers
@@ -203,17 +229,18 @@ impl HttpClient for EspHttpClient {
         let mut body = HeaplessVec::new();
         let mut buffer = [0u8; 512];
         let mut response = response;
-        
+
         loop {
             match response.read(&mut buffer) {
                 Ok(0) => break, // EOF
                 Ok(bytes_read) => {
                     if body.len() + bytes_read > body.capacity() {
-                        return Err(anyhow::anyhow!("Response body too large for embedded buffer"));
+                        return Err(anyhow::anyhow!(
+                            "Response body too large for embedded buffer"
+                        ));
                     }
-                    body.extend_from_slice(&buffer[..bytes_read]).map_err(|_| {
-                        anyhow::anyhow!("Failed to store response body")
-                    })?;
+                    body.extend_from_slice(&buffer[..bytes_read])
+                        .map_err(|_| anyhow::anyhow!("Failed to store response body"))?;
                 }
                 Err(e) => return Err(anyhow::anyhow!("Failed to read response: {}", e)),
             }
@@ -222,6 +249,26 @@ impl HttpClient for EspHttpClient {
         Ok(HttpResponse {
             status,
             headers: resp_headers,
+            body,
+        })
+    }
+}
+
+#[cfg(not(target_arch = "xtensa"))]
+#[async_trait]
+impl HttpClient for EspHttpClient {
+    async fn send(&self, request: HttpRequest) -> Result<HttpResponse> {
+        // Mock HTTP client for testing
+        log::info!("Mock HTTP request: {} {}", request.method, request.url);
+
+        let mut body = HeaplessVec::new();
+        let mock_response = br#"{"status": "ok", "mock": true}"#;
+        body.extend_from_slice(mock_response)
+            .map_err(|_| anyhow::anyhow!("Failed to create mock response"))?;
+
+        Ok(HttpResponse {
+            status: StatusCode(200),
+            headers: HashMap::new(),
             body,
         })
     }
@@ -275,12 +322,14 @@ mod tests {
         let mut large_data = std::collections::HashMap::new();
         // Create a JSON that's too large for embedded constraints
         for i in 0..1000 {
-            large_data.insert(format!("key_{}", i), format!("value_{}", i.to_string().repeat(100)));
+            large_data.insert(
+                format!("key_{}", i),
+                format!("value_{}", i.to_string().repeat(100)),
+            );
         }
         let large_json = serde_json::to_value(&large_data).unwrap();
-        
-        let result = HttpRequest::new("POST", "https://example.com")
-            .with_json_body(&large_json);
+
+        let result = HttpRequest::new("POST", "https://example.com").with_json_body(&large_json);
 
         assert!(result.is_err());
     }
