@@ -1,8 +1,11 @@
 use actix_web::{test, web, App};
 use chrono::Utc;
-use feder8::config::Config;
-use feder8::database::{DatabaseRef, DbActivity, DbActor, MockDatabase};
-use feder8::handlers;
+use feder8_core::{
+    config::Config,
+    native::database::{DatabaseRef, MockDatabase},
+    native::handlers,
+    traits::{DbActor, DbActivity},
+};
 use mockall::predicate::*;
 use serde_json::json;
 use std::sync::Arc;
@@ -98,7 +101,7 @@ async fn test_get_actor_handler_database_error() {
     mock.expect_get_actor_by_username()
         .with(eq("error_user"))
         .returning(|_| {
-            Err(feder8::database::DatabaseError::Query(
+            Err(feder8_core::native::database::DatabaseError::Query(
                 "Database error".to_string(),
             ))
         });
@@ -600,9 +603,9 @@ async fn test_error_handling_in_handlers() {
     mock.expect_get_actor_by_username()
         .with(eq("error_actor"))
         .returning(|_| {
-            Err(feder8::database::DatabaseError::Query(
-                "Connection failed".to_string(),
-            ))
+                    Err(feder8_core::native::database::DatabaseError::Query(
+            "Connection failed".to_string(),
+        ))
         });
 
     // Test database error in create_note
@@ -622,7 +625,7 @@ async fn test_error_handling_in_handlers() {
         });
 
     mock.expect_create_note().returning(|_| {
-        Err(feder8::database::DatabaseError::Query(
+        Err(feder8_core::native::database::DatabaseError::Query(
             "Insert failed".to_string(),
         ))
     });

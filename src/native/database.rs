@@ -3,33 +3,9 @@
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use mockall::automock;
-use serde_json::Value;
 use sqlx::SqlitePool;
 use std::sync::Arc;
-
-#[derive(Debug, Clone)]
-pub struct DbActor {
-    pub id: String,
-    pub username: String,
-    pub name: String,
-    pub summary: Option<String>,
-    pub public_key_pem: String,
-    pub private_key_pem: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone)]
-pub struct DbActivity {
-    pub id: String,
-    pub actor_id: String,
-    pub activity_type: String,
-    pub object: Value,
-    pub to_recipients: Vec<String>,
-    pub cc_recipients: Vec<String>,
-    pub published: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-}
+use crate::traits::{DbActor, DbActivity};
 
 #[derive(Debug, Clone)]
 pub struct DbNote {

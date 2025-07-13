@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::database::DatabaseRef;
+use crate::native::database::DatabaseRef;
 use crate::models::Actor;
 use actix_web::{get, web, HttpResponse, Result};
 use tracing::warn;

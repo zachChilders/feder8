@@ -1,7 +1,7 @@
 use chrono::Utc;
-use feder8::database::{
-    create_configured_mock_database, DatabaseRef, DbActivity, DbActor, DbFollowRelation, DbNote,
-    MockDatabase,
+use feder8_core::{
+    native::database::{create_configured_mock_database, DatabaseRef, DbFollowRelation, DbNote, MockDatabase},
+    traits::{DbActor, DbActivity},
 };
 use mockall::predicate::*;
 use serde_json::json;
@@ -291,10 +291,10 @@ async fn test_database_error_handling() {
 
     // Test database errors
     mock.expect_get_actor_by_username()
-        .returning(|_| Err(feder8::database::DatabaseError::NotFound));
+        .returning(|_| Err(feder8_core::native::database::DatabaseError::NotFound));
 
     mock.expect_create_actor()
-        .returning(|_| Err(feder8::database::DatabaseError::AlreadyExists));
+        .returning(|_| Err(feder8_core::native::database::DatabaseError::AlreadyExists));
 
     let db: DatabaseRef = Arc::new(mock);
 

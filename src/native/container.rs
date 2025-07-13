@@ -1,7 +1,8 @@
 use crate::config::Config;
-use crate::database::DatabaseRef;
-use crate::http::{HttpClient, ReqwestClient};
-use crate::services::delivery::DeliveryService;
+use crate::native::database::DatabaseRef;
+use crate::traits::HttpClient;
+use crate::native::http::client::ReqwestClient;
+use crate::native::services::delivery::DeliveryService;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,20 +19,20 @@ pub struct Container {
 #[allow(dead_code)]
 impl Container {
     /// Create a new container with default implementations
-    pub fn new(config: Config, database: DatabaseRef) -> Self {
+    pub fn new(config: Config, database: DatabaseRef) -> Result<Self, anyhow::Error> {
         // Create HTTP client
         let http_client: Arc<dyn HttpClient> =
-            Arc::new(ReqwestClient::with_timeout(Duration::from_secs(30)));
+            Arc::new(ReqwestClient::with_timeout(Duration::from_secs(30))?);
 
         // Create delivery service with injected HTTP client
         let delivery_service = Arc::new(DeliveryService::new(config.clone(), http_client.clone()));
 
-        Self {
+        Ok(Self {
             config,
             database,
             http_client,
             delivery_service,
-        }
+        })
     }
 
     /// Create a new container with custom HTTP client
@@ -39,15 +40,15 @@ impl Container {
         config: Config,
         database: DatabaseRef,
         http_client: Arc<dyn HttpClient>,
-    ) -> Self {
+    ) -> Result<Self, anyhow::Error> {
         let delivery_service = Arc::new(DeliveryService::new(config.clone(), http_client.clone()));
 
-        Self {
+        Ok(Self {
             config,
             database,
             http_client,
             delivery_service,
-        }
+        })
     }
 
     /// Get the configuration
@@ -104,13 +105,13 @@ impl ContainerBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Container, String> {
-        let config = self.config.ok_or("Config is required")?;
-        let database = self.database.ok_or("Database is required")?;
+    pub fn build(self) -> Result<Container, anyhow::Error> {
+        let config = self.config.ok_or_else(|| anyhow::anyhow!("Config is required"))?;
+        let database = self.database.ok_or_else(|| anyhow::anyhow!("Database is required"))?;
 
         match self.http_client {
-            Some(http_client) => Ok(Container::with_http_client(config, database, http_client)),
-            None => Ok(Container::new(config, database)),
+            Some(http_client) => Container::with_http_client(config, database, http_client),
+            None => Container::new(config, database),
         }
     }
 }
@@ -124,9 +125,8 @@ impl Default for ContainerBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::database::create_configured_mock_database;
-    use crate::http::client::{HttpRequest, HttpResponse, StatusCode};
-    use crate::http::HttpClient;
+    use crate::native::database::create_configured_mock_database;
+    use crate::traits::{HttpClient, HttpRequest, HttpResponse};
     use anyhow::Result;
     use std::collections::HashMap;
 
@@ -135,9 +135,9 @@ mod tests {
 
     #[async_trait::async_trait]
     impl HttpClient for MockHttpClient {
-        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse> {
+        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
             Ok(HttpResponse {
-                status: StatusCode(200),
+                status_code: 200,
                 headers: HashMap::new(),
                 body: b"OK".to_vec(),
             })
@@ -159,7 +159,7 @@ mod tests {
     fn test_container_creation() {
         let config = create_test_config();
         let database = Arc::new(create_configured_mock_database());
-        let container = Container::new(config.clone(), database);
+        let container = Container::new(config.clone(), database).unwrap();
 
         assert_eq!(container.config().server_name, config.server_name);
         assert_eq!(container.config().server_url, config.server_url);
@@ -172,7 +172,7 @@ mod tests {
         let config = create_test_config();
         let database = Arc::new(create_configured_mock_database());
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
-        let container = Container::with_http_client(config.clone(), database, http_client);
+        let container = Container::with_http_client(config.clone(), database, http_client).unwrap();
 
         assert_eq!(container.config().server_name, config.server_name);
         assert_eq!(container.config().server_url, config.server_url);
@@ -206,7 +206,7 @@ mod tests {
         let result = ContainerBuilder::new().with_database(database).build();
 
         assert!(result.is_err());
-        assert_eq!(result.err().unwrap(), "Config is required");
+        assert_eq!(result.err().unwrap().to_string(), "Config is required");
     }
 
     #[test]
@@ -216,14 +216,14 @@ mod tests {
         let result = ContainerBuilder::new().with_config(config).build();
 
         assert!(result.is_err());
-        assert_eq!(result.err().unwrap(), "Database is required");
+        assert_eq!(result.err().unwrap().to_string(), "Database is required");
     }
 
     #[test]
     fn test_container_clone() {
         let config = create_test_config();
         let database = Arc::new(create_configured_mock_database());
-        let container = Container::new(config.clone(), database);
+        let container = Container::new(config.clone(), database).unwrap();
         let cloned_container = container.clone();
 
         assert_eq!(

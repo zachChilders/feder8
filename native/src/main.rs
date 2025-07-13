@@ -1,14 +1,6 @@
-mod config;
-mod container;
-mod database;
-mod handlers;
-mod http;
-mod models;
-mod services;
-
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use container::Container;
-use database::{create_configured_mock_database, DatabaseRef};
+use feder8_core::{Config, Container, DatabaseRef};
+use feder8_core::native::{database::create_configured_mock_database, handlers};
 use std::sync::Arc;
 
 #[actix_web::main]
@@ -16,7 +8,7 @@ async fn main() -> std::io::Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
-    let config = config::Config::default();
+    let config = Config::default();
 
     tracing::info!("Starting Fediverse server on port {}", config.port);
     tracing::info!("Server URL: {}", config.server_url);
@@ -27,7 +19,7 @@ async fn main() -> std::io::Result<()> {
     tracing::info!("Database initialized (using mock)");
 
     // Initialize dependency injection container
-    let container = Container::new(config.clone(), db);
+    let container = Container::new(config.clone(), db).expect("Failed to create container");
     tracing::info!("Dependency injection container initialized");
 
     let container_clone = container.clone();

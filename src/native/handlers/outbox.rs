@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::database::DatabaseRef;
+use crate::native::database::DatabaseRef;
 use crate::models::OrderedCollection;
 use actix_web::{get, post, web, HttpResponse, Result};
 use serde_json::Value;
@@ -159,7 +159,7 @@ pub async fn post_outbox(
                                 .unwrap_or_default();
 
                             // Create the note in database
-                            let db_note = crate::database::DbNote {
+                            let db_note = crate::native::database::DbNote {
                                 id: note_id.clone(),
                                 attributed_to: actor.id.clone(),
                                 content,
@@ -188,7 +188,7 @@ pub async fn post_outbox(
                             activity_object["attributedTo"] =
                                 serde_json::Value::String(actor.id.clone());
 
-                            let db_activity = crate::database::DbActivity {
+                            let db_activity = crate::traits::DbActivity {
                                 id: activity_id.clone(),
                                 actor_id: actor.id.clone(),
                                 activity_type: "Create".to_string(),
