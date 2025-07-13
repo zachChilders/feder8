@@ -1,28 +1,136 @@
-# Fediverse ActivityPub Implementation
+# Feder8 - Dual-Target ActivityPub Implementation
 
-This is a basic implementation of the ActivityPub protocol for the Fediverse, allowing you to send and receive messages between different nodes.
+A Rust-based ActivityPub implementation that supports both native (desktop/server) and embedded (ESP32) targets. This project provides a complete foundation for building Fediverse-compatible applications.
 
-## Features
+## 🚀 Features
 
-- ✅ ActivityPub core models (Actor, Activity, Note, etc.)
+### Core ActivityPub Support
+- ✅ ActivityPub core models (Actor, Activity, Note, Collection, etc.)
 - ✅ WebFinger discovery (RFC 7033)
 - ✅ Inbox/Outbox endpoints
-- ✅ Basic message exchange (Create activities)
-- ✅ HTTP server with proper content types
-- ✅ Structured logging
+- ✅ HTTP signature support
+- ✅ Structured logging and tracing
+- ✅ Comprehensive test suite
 
-## Quick Start
+### Dual Target Architecture
+- **Native Target**: Full-featured server implementation with SQLite database
+- **ESP32 Target**: Embedded implementation for IoT devices and microcontrollers
 
-### 1. Build and Run
+### Database & Storage
+- ✅ SQLite database with migrations
+- ✅ Mock database for testing
+- ✅ Actor, Activity, Note, and Follow relationship storage
+
+## 🏗️ Project Structure
+
+```
+feder8/
+├── src/                    # Core library (feder8-core)
+│   ├── models/            # ActivityPub data models
+│   ├── traits/            # Abstract interfaces
+│   ├── config.rs          # Configuration management
+│   ├── errors.rs          # Error handling
+│   └── native/            # Native target implementation
+│       ├── database/      # SQLite database layer
+│       ├── handlers/      # HTTP request handlers
+│       ├── services/      # Business logic services
+│       ├── container.rs   # Dependency injection
+│       └── http/          # HTTP client implementation
+├── native/                # Native target binary
+│   └── src/main.rs        # Server entry point
+├── esp32/                 # ESP32 target implementation
+│   ├── src/main.rs        # ESP32 entry point
+│   ├── qemu_*.sh          # QEMU testing scripts
+│   └── test_runner.rs     # ESP32 test framework
+├── tests/                 # Integration tests
+│   ├── database_tests.rs
+│   ├── integration_tests.rs
+│   ├── handler_integration_tests.rs
+│   └── multinode_tests.rs
+└── migrations/            # Database schema migrations
+```
+
+## 🛠️ Quick Start
+
+### Prerequisites
+
+- Rust 1.70+ and Cargo
+- For ESP32 target: ESP-IDF v5.0+
+- For native target: SQLite development libraries
+
+### Building and Running
+
+#### Native Target (Default)
 
 ```bash
+# Build the core library
 cargo build
-cargo run
+
+# Run the native server
+cargo run --package feder8-native
+
+# Or run from the native directory
+cd native && cargo run
 ```
 
 The server will start on `http://localhost:8080` by default.
 
-### 2. Test the Implementation
+#### ESP32 Target
+
+```bash
+# Build for ESP32
+cargo build --target xtensa-esp32-none-elf --features esp32
+
+# Run in QEMU for testing
+cd esp32 && ./qemu_esp32.sh
+```
+
+### Testing
+
+```bash
+# Run all tests (native feature enabled by default)
+cargo test
+
+# Run specific test suites
+cargo test --test integration_tests
+cargo test --test database_tests
+cargo test --test handler_integration_tests
+cargo test --test multinode_tests
+
+# Run ESP32 tests
+cd esp32 && ./run_tests.sh
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+```bash
+export SERVER_NAME="My Fediverse Node"
+export SERVER_URL="http://localhost:8080"
+export PORT="8080"
+export ACTOR_NAME="alice"
+```
+
+### Database Setup
+
+The native target uses SQLite with automatic migrations:
+
+```bash
+# Database will be created automatically at feder8.db
+# Migrations are applied on first run
+```
+
+## 📡 API Endpoints
+
+### ActivityPub Standard Endpoints
+
+- `GET /.well-known/webfinger` - Service discovery
+- `GET /users/{username}` - Actor profile
+- `POST /users/{username}/inbox` - Receive activities
+- `GET /users/{username}/outbox` - Send activities
+
+### Example Usage
 
 #### Check Actor Profile
 ```bash
@@ -36,7 +144,7 @@ curl -H "Accept: application/jrd+json" \
      "http://localhost:8080/.well-known/webfinger?resource=acct:alice@localhost:8080"
 ```
 
-#### Send a Message
+#### Send a Create Activity
 ```bash
 curl -X POST http://localhost:8080/users/alice/inbox \
      -H "Content-Type: application/activity+json" \
@@ -46,38 +154,15 @@ curl -X POST http://localhost:8080/users/alice/inbox \
        "type": "Create",
        "actor": "https://localhost:8080/users/alice",
        "object": {
-         "@context": ["https://www.w3.org/ns/activitystreams"],
-         "id": "https://example.com/notes/456",
          "type": "Note",
-         "attributedTo": "https://localhost:8080/users/alice",
          "content": "Hello, Fediverse!",
-         "to": ["https://www.w3.org/ns/activitystreams#Public"],
-         "cc": ["https://localhost:8080/users/alice/followers"]
+         "attributedTo": "https://localhost:8080/users/alice"
        },
-       "to": ["https://www.w3.org/ns/activitystreams#Public"],
-       "cc": ["https://localhost:8080/users/alice/followers"]
+       "to": ["https://www.w3.org/ns/activitystreams#Public"]
      }'
 ```
 
-### 3. Run the Test Script
-
-```bash
-# In a separate terminal
-cargo run --bin test_message_exchange
-```
-
-## Configuration
-
-Set environment variables to customize the server:
-
-```bash
-export SERVER_NAME="My Fediverse Node"
-export SERVER_URL="http://localhost:8080"
-export PORT="8080"
-export ACTOR_NAME="alice"
-```
-
-## Architecture
+## 🏛️ Architecture
 
 ### Core Components
 
@@ -87,57 +172,99 @@ export ACTOR_NAME="alice"
    - `Note`: Basic message content
    - `Collection`: Ordered/unordered collections
 
-2. **Handlers** (`src/handlers/`)
-   - `webfinger.rs`: Service discovery endpoint
-   - `actor.rs`: Actor profile endpoint
-   - `inbox.rs`: Receives incoming activities
-   - `outbox.rs`: Manages outgoing activities
+2. **Traits** (`src/traits/`)
+   - `HttpClient`: Abstract HTTP client interface
+   - `Database`: Abstract database interface
+   - `DeliveryService`: Activity delivery service
 
-3. **Services** (`src/services/`)
-   - `delivery.rs`: Handles message delivery to other servers
-   - `signature.rs`: HTTP signature verification (simplified)
+3. **Native Implementation** (`src/native/`)
+   - `handlers/`: HTTP request handlers
+   - `database/`: SQLite database implementation
+   - `services/`: Business logic services
+   - `container.rs`: Dependency injection container
 
-### ActivityPub Endpoints
+4. **ESP32 Implementation** (`src/esp32/`)
+   - `server.rs`: HTTP server wrapper
+   - `wifi.rs`: WiFi connectivity management
+   - `delivery.rs`: Embedded delivery service
 
-- `/.well-known/webfinger` - Service discovery
-- `/users/{username}` - Actor profile
-- `/users/{username}/inbox` - Receive activities
-- `/users/{username}/outbox` - Send activities
-
-## Message Flow
-
-1. **Create a Note**: Send a `Create` activity with a `Note` object
-2. **Receive in Inbox**: Other servers POST activities to your inbox
-3. **Process Activities**: Handle different activity types (Create, Follow, Accept, etc.)
-4. **Deliver to Followers**: Send activities to follower inboxes
-
-## Supported Activity Types
+### Supported Activity Types
 
 - `Create` - Create a new Note
 - `Follow` - Follow another actor
 - `Accept` - Accept a Follow request
 - `Undo` - Undo previous activities
 
-## Next Steps
+## 🧪 Testing
 
-To make this a production-ready Fediverse server, you would need to add:
+The project includes comprehensive testing:
 
-1. **Database Integration**: Store actors, activities, and relationships
-2. **HTTP Signatures**: Full RFC 9421 implementation
-3. **Content Moderation**: Filter inappropriate content
-4. **Rate Limiting**: Prevent spam and abuse
-5. **Media Handling**: Support for images, videos, etc.
-6. **Federation**: Connect with other Fediverse servers
-7. **Web Interface**: User-friendly frontend
+- **Unit Tests**: Core library functionality
+- **Integration Tests**: HTTP endpoint testing
+- **Database Tests**: Data persistence testing
+- **Multi-node Tests**: Federation simulation
+- **ESP32 Tests**: Embedded target validation
 
-## Testing with Other Fediverse Servers
+### Running Tests
 
-This implementation should be compatible with:
+```bash
+# All tests
+cargo test
+
+# Specific test categories
+cargo test --test integration_tests
+cargo test --test database_tests
+
+# ESP32 tests
+cd esp32 && ./run_tests.sh
+```
+
+## 🔌 Federation
+
+This implementation is compatible with:
 - Mastodon
 - Pleroma
 - Misskey
 - Other ActivityPub-compliant servers
 
-## License
+The multi-node tests demonstrate federation capabilities between multiple instances.
 
-MIT License - feel free to use this as a starting point for your own Fediverse implementation! 
+## 🚧 Development Status
+
+### ✅ Completed
+- Core ActivityPub models and serialization
+- WebFinger discovery
+- Inbox/Outbox endpoints
+- SQLite database integration
+- Comprehensive test suite
+- ESP32 embedded support
+- HTTP signature framework
+
+### 🔄 In Progress
+- Enhanced federation features
+- Content moderation
+- Rate limiting
+- Media handling
+
+### 📋 Planned
+- Web interface
+- Advanced federation features
+- Performance optimizations
+- Additional embedded targets
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+This project builds on the ActivityPub specification and aims to provide a solid foundation for Fediverse applications. 
