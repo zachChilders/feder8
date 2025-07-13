@@ -2,7 +2,6 @@
 members = [
     ".",
     "native",
-    "src/firmware"
 ]
 
 [package]

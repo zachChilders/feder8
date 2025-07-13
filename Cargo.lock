@@ -1218,31 +1218,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "feder8-firmware"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "embedded-io 0.6.1",
- "embedded-nal",
- "embedded-nal-async",
- "embedded-svc",
- "embuild",
- "esp-idf-hal",
- "esp-idf-svc",
- "esp-idf-sys",
- "heapless",
- "log",
- "serde",
- "serde_json",
- "tokio",
- "tokio-test",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "feder8-native"
 version = "0.1.0"
 dependencies = [
