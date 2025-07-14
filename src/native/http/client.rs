@@ -13,9 +13,7 @@ pub struct ReqwestClient {
 
 impl ReqwestClient {
     pub fn new() -> Result<Self> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()?;
+        let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
         Ok(Self { client })
     }
 
@@ -99,7 +97,10 @@ impl ReqwestClient {
 
 #[async_trait]
 impl HttpClient for ReqwestClient {
-    async fn send(&self, request: HttpRequest) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
+    async fn send(
+        &self,
+        request: HttpRequest,
+    ) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
         let method = reqwest::Method::from_bytes(request.method.as_bytes())?;
         let mut req = self.client.request(method, &request.url);
 
@@ -140,7 +141,6 @@ impl Default for ReqwestClient {
 mod tests {
     use super::*;
 
-
     #[tokio::test]
     async fn test_reqwest_client_creation() {
         let client = ReqwestClient::new();
@@ -153,4 +153,4 @@ mod tests {
         let client = ReqwestClient::with_timeout(timeout);
         assert!(client.is_ok());
     }
-} 
+}

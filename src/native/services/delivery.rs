@@ -45,7 +45,10 @@ impl DeliveryService {
                 inbox_url,
                 response.status()
             );
-            if let Ok(error_text) = response.text().map_err(|e| anyhow::anyhow!("Failed to read response text: {}", e)) {
+            if let Ok(error_text) = response
+                .text()
+                .map_err(|e| anyhow::anyhow!("Failed to read response text: {}", e))
+            {
                 error!("Error response: {}", error_text);
             }
         }
@@ -112,7 +115,10 @@ mod tests {
 
     #[async_trait::async_trait]
     impl HttpClient for MockHttpClient {
-        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
+        async fn send(
+            &self,
+            _request: HttpRequest,
+        ) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
             if self.should_succeed {
                 Ok(HttpResponse {
                     status_code: 200,

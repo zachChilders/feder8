@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
+use crate::traits::{DbActivity, DbActor};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use mockall::automock;
 use sqlx::SqlitePool;
 use std::sync::Arc;
-use crate::traits::{DbActor, DbActivity};
 
 #[derive(Debug, Clone)]
 pub struct DbNote {

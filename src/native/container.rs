@@ -1,8 +1,8 @@
 use crate::config::Config;
 use crate::native::database::DatabaseRef;
-use crate::traits::HttpClient;
 use crate::native::http::client::ReqwestClient;
 use crate::native::services::delivery::DeliveryService;
+use crate::traits::HttpClient;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -106,8 +106,12 @@ impl ContainerBuilder {
     }
 
     pub fn build(self) -> Result<Container, anyhow::Error> {
-        let config = self.config.ok_or_else(|| anyhow::anyhow!("Config is required"))?;
-        let database = self.database.ok_or_else(|| anyhow::anyhow!("Database is required"))?;
+        let config = self
+            .config
+            .ok_or_else(|| anyhow::anyhow!("Config is required"))?;
+        let database = self
+            .database
+            .ok_or_else(|| anyhow::anyhow!("Database is required"))?;
 
         match self.http_client {
             Some(http_client) => Container::with_http_client(config, database, http_client),
@@ -135,7 +139,10 @@ mod tests {
 
     #[async_trait::async_trait]
     impl HttpClient for MockHttpClient {
-        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
+        async fn send(
+            &self,
+            _request: HttpRequest,
+        ) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
             Ok(HttpResponse {
                 status_code: 200,
                 headers: HashMap::new(),

@@ -3,8 +3,8 @@ pub mod actor;
 pub mod object;
 
 // Re-export commonly used types
-pub use actor::{Actor, PublicKey, Icon};
 pub use activity::Activity;
+pub use actor::{Actor, Icon, PublicKey};
 pub use object::{Note, OrderedCollection};
 
 // Conditional re-exports based on target

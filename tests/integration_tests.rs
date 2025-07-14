@@ -1,10 +1,9 @@
 use actix_web::{http::StatusCode, test, web, App};
 use feder8_core::{
     config::Config,
+    models::Actor,
     native::database::{create_configured_mock_database, DatabaseRef},
     native::handlers,
-    models::Actor,
-
 };
 use serde_json::{json, Value};
 use std::sync::Arc;

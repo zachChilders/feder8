@@ -4,7 +4,7 @@ use feder8_core::{
     config::Config,
     native::database::{DatabaseRef, MockDatabase},
     native::handlers,
-    traits::{DbActor, DbActivity},
+    traits::{DbActivity, DbActor},
 };
 use mockall::predicate::*;
 use serde_json::json;
@@ -603,9 +603,9 @@ async fn test_error_handling_in_handlers() {
     mock.expect_get_actor_by_username()
         .with(eq("error_actor"))
         .returning(|_| {
-                    Err(feder8_core::native::database::DatabaseError::Query(
-            "Connection failed".to_string(),
-        ))
+            Err(feder8_core::native::database::DatabaseError::Query(
+                "Connection failed".to_string(),
+            ))
         });
 
     // Test database error in create_note

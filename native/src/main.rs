@@ -1,6 +1,6 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use feder8_core::{Config, Container, DatabaseRef};
 use feder8_core::native::{database::create_configured_mock_database, handlers};
+use feder8_core::{Config, Container, DatabaseRef};
 use std::sync::Arc;
 
 #[actix_web::main]

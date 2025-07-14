@@ -1,7 +1,9 @@
 use chrono::Utc;
 use feder8_core::{
-    native::database::{create_configured_mock_database, DatabaseRef, DbFollowRelation, DbNote, MockDatabase},
-    traits::{DbActor, DbActivity},
+    native::database::{
+        create_configured_mock_database, DatabaseRef, DbFollowRelation, DbNote, MockDatabase,
+    },
+    traits::{DbActivity, DbActor},
 };
 use mockall::predicate::*;
 use serde_json::json;
