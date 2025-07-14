@@ -51,7 +51,7 @@ jobs:
     
     - name: Test main project (excluding firmware)
       run: |
-        cargo test --workspace --exclude feder8-firmware
+        cargo test --workspace --features native
     
     - name: Run firmware tests
       run: |
@@ -75,4 +75,4 @@ jobs:
       run: cargo fmt --all -- --check
     
     - name: Run clippy (main project only)
-      run: cargo clippy --workspace --exclude feder8-firmware -- -D warnings
+      run: cargo clippy --workspace --features native -- -D warnings
