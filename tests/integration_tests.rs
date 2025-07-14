@@ -1,9 +1,9 @@
 use actix_web::{http::StatusCode, test, web, App};
-use feder8::{
+use feder8_core::{
     config::Config,
-    database::{create_configured_mock_database, DatabaseRef},
-    handlers,
     models::Actor,
+    native::database::{create_configured_mock_database, DatabaseRef},
+    native::handlers,
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -161,11 +161,11 @@ async fn test_get_actor_different_username() {
 #[actix_web::test]
 async fn test_inbox_create_activity() {
     let config = create_test_config();
-    let mut mock = feder8::database::MockDatabase::new();
+    let mut mock = feder8_core::native::database::MockDatabase::new();
 
     // Set up expectations for inbox processing
     mock.expect_get_actor_by_username().returning(|username| {
-        Ok(Some(feder8::database::DbActor {
+        Ok(Some(feder8_core::traits::DbActor {
             id: format!("https://test.example.com/users/{username}"),
             username: username.to_string(),
             name: format!("Test User {username}"),
@@ -310,11 +310,11 @@ async fn test_get_outbox() {
 #[actix_web::test]
 async fn test_post_outbox_create_activity() {
     let config = create_test_config();
-    let mut mock = feder8::database::MockDatabase::new();
+    let mut mock = feder8_core::native::database::MockDatabase::new();
 
     // Set up expectations for outbox processing
     mock.expect_get_actor_by_username().returning(|username| {
-        Ok(Some(feder8::database::DbActor {
+        Ok(Some(feder8_core::traits::DbActor {
             id: format!("https://test.example.com/users/{username}"),
             username: username.to_string(),
             name: format!("Test User {username}"),

@@ -1,0 +1,23 @@
+[package]
+name = "feder8-native"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "feder8-native"
+path = "src/main.rs"
+
+[dependencies]
+feder8-core = { path = "..", features = ["native"] }
+actix-web = "4.4"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+actix-rt = "2.7"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+rand = "0.8" 

@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::database::DatabaseRef;
+use crate::native::database::DatabaseRef;
 use actix_web::{post, web, HttpResponse, Result};
 use serde_json::Value;
 use tracing::{info, warn};
@@ -87,7 +87,7 @@ pub async fn inbox(
 
                             // Create the note in database if it doesn't exist
                             if let Ok(None) = db.get_note_by_id(&note_id).await {
-                                let db_note = crate::database::DbNote {
+                                let db_note = crate::native::database::DbNote {
                                     id: note_id.clone(),
                                     attributed_to,
                                     content,
@@ -141,7 +141,7 @@ pub async fn inbox(
                                 })
                                 .unwrap_or_default();
 
-                            let db_activity = crate::database::DbActivity {
+                            let db_activity = crate::traits::DbActivity {
                                 id: activity_id,
                                 actor_id,
                                 activity_type: "Create".to_string(),
@@ -187,7 +187,7 @@ pub async fn inbox(
                 if following_id == target_actor.id {
                     let follow_id =
                         format!("{}/follows/{}", config.server_url, uuid::Uuid::new_v4());
-                    let db_follow = crate::database::DbFollowRelation {
+                    let db_follow = crate::native::database::DbFollowRelation {
                         id: follow_id,
                         follower_id,
                         following_id,

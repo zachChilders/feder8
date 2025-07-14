@@ -28,6 +28,58 @@ impl Default for Config {
     }
 }
 
+/// Configuration for embedded ActivityPub nodes
+#[cfg(feature = "esp32")]
+#[derive(Debug, Clone)]
+pub struct EmbeddedConfig {
+    pub server_name: heapless::String<64>,
+    pub server_url: heapless::String<128>,
+    pub actor_name: heapless::String<64>,
+    pub wifi_ssid: heapless::String<64>,
+    pub wifi_password: heapless::String<64>,
+    pub private_key_pem: Option<heapless::String<1024>>,
+    pub public_key_pem: Option<heapless::String<512>>,
+}
+
+#[cfg(feature = "esp32")]
+impl EmbeddedConfig {
+    pub fn new(
+        server_name: &str,
+        server_url: &str,
+        actor_name: &str,
+        wifi_ssid: &str,
+        wifi_password: &str,
+    ) -> Result<Self, &'static str> {
+        if server_name.len() > 64 || server_url.len() > 128 || actor_name.len() > 64 {
+            return Err("Server configuration parameters too long");
+        }
+
+        if wifi_ssid.len() > 64 || wifi_password.len() > 64 {
+            return Err("WiFi configuration parameters too long");
+        }
+
+        Ok(Self {
+            server_name: heapless::String::from(server_name),
+            server_url: heapless::String::from(server_url),
+            actor_name: heapless::String::from(actor_name),
+            wifi_ssid: heapless::String::from(wifi_ssid),
+            wifi_password: heapless::String::from(wifi_password),
+            private_key_pem: None,
+            public_key_pem: None,
+        })
+    }
+
+    pub fn with_keys(mut self, private_key: &str, public_key: &str) -> Result<Self, &'static str> {
+        if private_key.len() > 1024 || public_key.len() > 512 {
+            return Err("Keys too long for embedded constraints");
+        }
+
+        self.private_key_pem = Some(heapless::String::from(private_key));
+        self.public_key_pem = Some(heapless::String::from(public_key));
+        Ok(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

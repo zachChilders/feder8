@@ -12,8 +12,7 @@ fn main() {
     };
 
     let firmware_dir = env::current_dir()
-        .expect("Failed to get current directory")
-        .join("src/firmware");
+        .expect("Failed to get current directory");
 
     let script_path = firmware_dir.join(script);
 

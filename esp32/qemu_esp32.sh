@@ -41,7 +41,7 @@ echo -e "${GREEN}Starting ESP32 emulation...${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop the emulation${NC}"
 
 # Find the built ELF file
-ELF_FILE=$(find target -name "feder8-firmware" -type f | head -1)
+ELF_FILE=$(find target -name "feder8-esp32" -type f | head -1)
 
 if [ -z "$ELF_FILE" ]; then
     echo -e "${RED}Error: Could not find built firmware ELF file${NC}"

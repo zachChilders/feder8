@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::http::client::HttpClient;
+use crate::traits::HttpClient;
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -34,17 +34,21 @@ impl DeliveryService {
         let response = self
             .client
             .post_with_headers(inbox_url, headers, &activity)
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!("HTTP request failed: {}", e))?;
 
-        if response.status().is_success() {
+        if response.is_success() {
             info!("Successfully delivered activity to {}", inbox_url);
         } else {
             warn!(
                 "Failed to deliver activity to {}: {}",
                 inbox_url,
-                response.status().0
+                response.status()
             );
-            if let Ok(error_text) = response.text() {
+            if let Ok(error_text) = response
+                .text()
+                .map_err(|e| anyhow::anyhow!("Failed to read response text: {}", e))
+            {
                 error!("Error response: {}", error_text);
             }
         }
@@ -94,7 +98,7 @@ impl DeliveryService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::client::{HttpClient, HttpRequest, HttpResponse, StatusCode};
+    use crate::traits::{HttpClient, HttpRequest, HttpResponse};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -111,16 +115,19 @@ mod tests {
 
     #[async_trait::async_trait]
     impl HttpClient for MockHttpClient {
-        async fn send(&self, _request: HttpRequest) -> Result<HttpResponse> {
+        async fn send(
+            &self,
+            _request: HttpRequest,
+        ) -> Result<HttpResponse, Box<dyn std::error::Error + Send + Sync>> {
             if self.should_succeed {
                 Ok(HttpResponse {
-                    status: StatusCode(200),
+                    status_code: 200,
                     headers: std::collections::HashMap::new(),
                     body: b"OK".to_vec(),
                 })
             } else {
                 Ok(HttpResponse {
-                    status: StatusCode(500),
+                    status_code: 500,
                     headers: std::collections::HashMap::new(),
                     body: b"Internal Server Error".to_vec(),
                 })

@@ -1,8 +1,8 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use feder8::{
+use feder8_core::{
     config::Config,
-    database::{create_configured_mock_database, DatabaseRef},
-    handlers,
+    native::database::{create_configured_mock_database, DatabaseRef},
+    native::handlers,
 };
 use rand::Rng;
 use reqwest::Client;
